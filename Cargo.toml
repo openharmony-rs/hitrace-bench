@@ -7,4 +7,5 @@ edition = "2024"
 anyhow = "1.0.97"
 clap = { version = "4.5.34", features = ["derive"] }
 regex = "1.11.1"
+time = { version = "0.3.41", features = ["macros", "parsing"] }
 which = "7.0.2"

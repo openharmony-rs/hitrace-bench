@@ -1,45 +1,61 @@
+use ::time::{Duration, PrimitiveDateTime, format_description};
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, command};
 use regex::Regex;
 use std::{
+    collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
     process::Command,
     sync::LazyLock,
-    time::Duration,
 };
+use time::{Time, format_description::BorrowedFormatItem};
 
-#[derive(Debug)]
-struct TimeStamp {
-    major: u64,
-    minor: u64,
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+/// Run servo on an open harmony device and collect timing information
+struct Args {
+    #[arg(short, long)]
+    /// Show all traces for servo
+    all_traces: bool,
+
+    /// The number of tries we should have to average
+    #[arg(short, long, default_value_t = 1)]
+    tries: usize,
+
+    /// The homepage we try to load
+    #[arg(short = 'p', long, default_value_t = String::from("https://servo.org"))]
+    homepage: String,
+
+    /// Trace Buffer size in KB
+    #[arg(short = 'b', long, default_value_t = 524288)]
+    trace_buffer: u64,
+
+    /// Number of sleep seconds
+    #[arg(short, long, default_value_t = 5)]
+    sleep: u64,
 }
 
-impl TimeStamp {
-    fn difference(&self, other: &TimeStamp) -> (i64, i64) {
-        (
-            other.major as i64 - self.major as i64,
-            other.minor as i64 - self.minor as i64,
-        )
-    }
-}
-
 #[derive(Debug)]
+/// A parsed trace
 struct Trace {
+    /// Name of the program, i.e., org.servo.servo
     name: String,
+    /// pid
     pid: u64,
+    /// the cpu it ran on
     cpu: u64,
-    timestamp: TimeStamp,
+    /// timestamp of the trace
+    timestamp: Time,
+    /// Some shorthand code
     shorthand: String,
+    /// Full function name
     function: String,
 }
 
-static TRACE_BUFFER_IN_KB: &str = "524288";
-static HOMEPAGE: &str = "https://servo.org";
-static SLEEP_SECONDS: u64 = 5;
-
-fn exec_hdc_commands() -> Result<PathBuf> {
+/// Execute the hdc commands on the device.
+fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
     println!("Executing hdc commands");
     let hdc = which::which("hdc").context("Is hdc in the path?")?;
     Command::new(&hdc)
@@ -51,7 +67,7 @@ fn exec_hdc_commands() -> Result<PathBuf> {
             "shell",
             "hitrace",
             "-b",
-            TRACE_BUFFER_IN_KB,
+            &args.trace_buffer.to_string(),
             "app",
             "graphic",
             "ohos",
@@ -77,15 +93,15 @@ fn exec_hdc_commands() -> Result<PathBuf> {
         ])
         .output()?;
 
-    println!("Sleeping for {}", SLEEP_SECONDS);
-    std::thread::sleep(Duration::from_secs(SLEEP_SECONDS));
+    println!("Sleeping for {}", args.sleep);
+    std::thread::sleep(std::time::Duration::from_secs(args.sleep));
 
     Command::new(&hdc)
         .args([
             "shell",
             "hitrace",
             "-b",
-            TRACE_BUFFER_IN_KB,
+            &args.trace_buffer.to_string(),
             "--trace_finish",
             "-o",
             "/data/local/tmp/ohtrace.txt",
@@ -117,90 +133,128 @@ static SERVO_TRACE_POINT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(.*?servo)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: ........(.*?):(.*?)\s*$").unwrap()
 });
 
+/// Read a file into traces
 fn read_file(f: &Path) -> Result<Vec<Trace>> {
     let f = File::open(f)?;
     let reader = BufReader::new(f);
-    let traces = reader
+    reader
         .lines()
         .map(|l| l.unwrap())
-        .map(|l| line_to_trace(&l))
-        .flatten()
-        .collect::<Vec<Trace>>();
-
-    Ok(traces)
+        .filter_map(|l| line_to_trace(&l))
+        .collect::<Result<Vec<Trace>>>()
+        .context("Could not parse one thing")
 }
 
 /// There is always one trace per line
-fn line_to_trace(line: &str) -> Vec<Trace> {
+/// This means that having no matched lines is ok and returns None. Having a parsing error returns Some(Err)
+fn line_to_trace(line: &str) -> Option<Result<Trace>> {
     SERVO_TRACE_POINT_REGEX
-        .captures_iter(&line)
+        .captures_iter(line)
         .map(|c| c.extract())
         .map(match_to_trace)
-        .collect()
+        .next()
 }
 
+/// Read a regex matched line into a trace
 fn match_to_trace(
-    (_, [name, pid, cpu, time1, time2, shorthand, line]): (&str, [&str; 7]),
-) -> Trace {
-    Trace {
+    (l, [name, pid, cpu, time1, time2, shorthand, line]): (&str, [&str; 7]),
+) -> Result<Trace> {
+    let seconds = time1.parse()?;
+    let microseconds = time2.parse()?;
+    let timestamp = Time::from_hms(0, 0, 0)?
+        + Duration::microseconds(seconds)
+        + Duration::microseconds(microseconds);
+    Ok(Trace {
         name: name.to_owned(),
         pid: pid.parse().unwrap(),
         cpu: cpu.parse().unwrap(),
-        timestamp: TimeStamp {
-            major: time1.parse().unwrap(),
-            minor: time2.parse().unwrap(),
-        },
+        timestamp,
         shorthand: shorthand.to_owned(),
         function: line.to_owned(),
-    }
+    })
 }
 
 #[derive(Debug)]
+/// the difference in timing, represented by two integers, representing major and minor difference
 struct Difference<'a> {
-    difference: (i64, i64),
+    /// Major and minor differences
+    difference: Duration,
+    /// The name of the difference
     name: &'a str,
 }
 
+/// Way to construct filters
 struct Filters<'a> {
+    /// A name for the filter that will be output
     name: &'a str,
+    /// A function taking a trace and deciding if it should be the start of the timing
     first: fn(&Trace) -> bool,
+    /// A function taking a trace and deciding if it should be the end of the timing
     last: fn(&Trace) -> bool,
 }
 
+/// Look through the traces and find all timing differences coming from the filters
 fn find_notable_differences<'a>(
     v: Vec<Trace>,
     filters: &'a Vec<Filters>,
-) -> Vec<Result<Difference<'a>>> {
-    filters.iter().map(|f| {
+) -> Result<Vec<Difference<'a>>> {
+    let mut differences = Vec::new();
+    for f in filters {
         let first = v.iter().filter(|t| (f.first)(t)).collect::<Vec<&Trace>>();
         let last = v.iter().filter(|t| (f.last)(t)).collect::<Vec<&Trace>>();
-        if first.len()!=1 || last.len()!=1 {
-            Err(anyhow!("Your filter functions are not specific or over specific, we got the following number of results: first: {}, last: {}", first.len(), last.len()))
+        if first.len() != 1 || last.len() != 1 {
+            return Err(anyhow!(
+                "Your filter functions are not specific or over specific, we got the following number of results: name: {}, first: {}, last: {}",
+                f.name,
+                first.len(),
+                last.len()
+            ));
         } else {
-            Ok(Difference {
+            differences.push(Difference {
                 name: f.name,
-                difference: last[0].timestamp.difference(&first[0].timestamp)
+                difference: last[0].timestamp - first[0].timestamp,
             })
         }
-    }).collect()
+    }
+    Ok(differences)
 }
 
-#[derive(Parser, Debug)]
-#[command(version, about, long_about = None)]
-struct Args {
-    #[arg(short, long)]
-    all_traces: bool,
+/// Print the differences
+fn print_differences(args: &Args, diff: Vec<Difference>) {
+    let mut hash: HashMap<&str, Vec<Duration>> = HashMap::new();
+    for i in &diff {
+        hash.entry(i.name)
+            .and_modify(|v| v.push(i.difference))
+            .or_insert(vec![(i.difference)]);
+    }
+
+    for (key, val) in hash.iter() {
+        let avg = val
+            .iter()
+            .sum::<Duration>()
+            .checked_div(args.tries as i32)
+            .unwrap();
+        let min = val.iter().min().unwrap();
+        let max = val.iter().max().unwrap();
+        println!("----name avg min max------------------------------");
+        println!("{}: {:?} {:?} {:?}", key, avg, min, max);
+    }
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let log_path = exec_hdc_commands()?;
-    let traces = read_file(&log_path)?;
+    let mut traces = Vec::new();
+    for i in 1..args.tries + 1 {
+        println!("Running test {}", i);
+        let log_path = exec_hdc_commands(&args)?;
+        let mut new_traces = read_file(&log_path)?;
+        traces.append(&mut new_traces);
+    }
 
     let filters = vec![Filters {
-        name: "General",
-        first: |t| t.shorthand == "H" && t.function.contains("SetApplicationStatus"),
+        name: "Startup",
+        first: |t| t.shorthand == "H" && t.function.contains("panda::JSNApi::PostFork"),
         last: |t| t.shorthand == "H" && t.function == "PageLoadEndedPrompt",
     }];
 
@@ -208,9 +262,13 @@ fn main() -> Result<()> {
         for i in &traces {
             println!("{:?}", i);
         }
+        println!("----------------------------------------------------------\n\n");
     }
-    let filtered_results = find_notable_differences(traces, &filters);
+    let differences = find_notable_differences(traces, &filters).context(
+        "Something went wrong with finding the traces, look up to see what probably went wrong",
+    )?;
 
-    println!("{:?}", filtered_results);
+    print_differences(&args, differences);
+
     Ok(())
 }
