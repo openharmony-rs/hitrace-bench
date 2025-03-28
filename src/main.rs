@@ -7,10 +7,10 @@ use std::{
     fs::File,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
-    process::{Command, ExitStatus},
+    process::Command,
     sync::LazyLock,
 };
-use time::{Time, format_description::BorrowedFormatItem};
+use time::Time;
 use yansi::{Condition, Paint};
 
 #[derive(Parser, Debug)]
@@ -48,8 +48,10 @@ struct Trace {
     /// Name of the program, i.e., org.servo.servo
     name: String,
     /// pid
+    #[allow(clippy::unused)]
     pid: u64,
     /// the cpu it ran on
+    #[allow(clippy::unused)]
     cpu: u64,
     /// timestamp of the trace
     timestamp: Time,
@@ -128,7 +130,7 @@ fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
             "Servo did not start on the phone or we did not find a pid, is it installed?"
         ));
     }
-
+    // stop trace
     Command::new(&hdc)
         .args([
             "shell",
@@ -145,6 +147,7 @@ fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
     if !args.computer_output {
         println!("Writing ftrace to {}", tmp_path.to_str().unwrap());
     }
+    // Recieve trace
     Command::new(&hdc)
         .args([
             "file",
@@ -192,7 +195,7 @@ fn line_to_trace(line: &str) -> Option<Result<Trace>> {
 
 /// Read a regex matched line into a trace
 fn match_to_trace(
-    (l, [name, pid, cpu, time1, time2, shorthand, line]): (&str, [&str; 7]),
+    (_line, [name, pid, cpu, time1, time2, shorthand, line]): (&str, [&str; 7]),
 ) -> Result<Trace> {
     let seconds = time1.parse()?;
     let microseconds = time2.parse()?;
@@ -274,7 +277,10 @@ fn print_differences(args: &Args, hash: HashMap<&str, Vec<Duration>>) {
             .unwrap();
         let min = val.iter().min().unwrap();
         let max = val.iter().max().unwrap();
-        println!("----name avg min max------------------------------");
+        println!(
+            "----name avg min max------({}) runs (hp:{})------------------------",
+            args.tries, args.homepage
+        );
         println!(
             "{}: {:?} {:?} {:?}",
             key,
