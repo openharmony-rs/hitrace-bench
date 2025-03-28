@@ -1,16 +1,17 @@
 use ::time::{Duration, PrimitiveDateTime, format_description};
 use anyhow::{Context, Result, anyhow};
-use clap::{Parser, command};
+use clap::{Arg, Parser, command};
 use regex::Regex;
 use std::{
     collections::HashMap,
     fs::File,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, ExitStatus},
     sync::LazyLock,
 };
 use time::{Time, format_description::BorrowedFormatItem};
+use yansi::{Condition, Paint};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -35,6 +36,10 @@ struct Args {
     /// Number of sleep seconds
     #[arg(short, long, default_value_t = 5)]
     sleep: u64,
+
+    /// Stay silent and only return the miliseconds in a list
+    #[arg(short, long, default_value_t = false)]
+    computer_output: bool,
 }
 
 #[derive(Debug)]
@@ -56,12 +61,15 @@ struct Trace {
 
 /// Execute the hdc commands on the device.
 fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
-    println!("Executing hdc commands");
+    if !args.computer_output {
+        println!("Executing hdc commands");
+    }
     let hdc = which::which("hdc").context("Is hdc in the path?")?;
+    // stop servo
     Command::new(&hdc)
         .args(["shell", "aa", "force-stop", "org.servo.servo"])
         .output()?;
-
+    // start trace
     Command::new(&hdc)
         .args([
             "shell",
@@ -77,6 +85,7 @@ fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
             "--trace_begin",
         ])
         .output()?;
+    // start servo
     Command::new(&hdc)
         .args([
             "shell",
@@ -93,8 +102,32 @@ fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
         ])
         .output()?;
 
-    println!("Sleeping for {}", args.sleep);
+    if !args.computer_output {
+        println!("Sleeping for {}", args.sleep);
+    }
     std::thread::sleep(std::time::Duration::from_secs(args.sleep));
+
+    // Getting servo pid
+    let cmd = Command::new(&hdc)
+        .args(["shell", "pidof", "org.servo.servo"])
+        .output()
+        .context("did you have org.servo.servo installed on your phone?")?;
+    if cmd.stdout.is_empty() {
+        Command::new(&hdc)
+            .args([
+                "shell",
+                "hitrace",
+                "-b",
+                &args.trace_buffer.to_string(),
+                "--trace_finish",
+                "-o",
+                "/data/local/tmp/ohtrace.txt",
+            ])
+            .output()?;
+        return Err(anyhow!(
+            "Servo did not start on the phone or we did not find a pid, is it installed?"
+        ));
+    }
 
     Command::new(&hdc)
         .args([
@@ -109,7 +142,9 @@ fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
         .output()?;
     let mut tmp_path = std::env::temp_dir();
     tmp_path.push("servo.ftrace");
-    println!("Writing ftrace to {}", tmp_path.to_str().unwrap());
+    if !args.computer_output {
+        println!("Writing ftrace to {}", tmp_path.to_str().unwrap());
+    }
     Command::new(&hdc)
         .args([
             "file",
@@ -162,7 +197,7 @@ fn match_to_trace(
     let seconds = time1.parse()?;
     let microseconds = time2.parse()?;
     let timestamp = Time::from_hms(0, 0, 0)?
-        + Duration::microseconds(seconds)
+        + Duration::seconds(seconds)
         + Duration::microseconds(microseconds);
     Ok(Trace {
         name: name.to_owned(),
@@ -194,15 +229,17 @@ struct Filters<'a> {
 }
 
 /// Look through the traces and find all timing differences coming from the filters
-fn find_notable_differences<'a>(
+fn find_and_collect_notable_differences<'a>(
+    args: &Args,
     v: Vec<Trace>,
     filters: &'a Vec<Filters>,
-) -> Result<Vec<Difference<'a>>> {
+) -> Result<HashMap<&'a str, Vec<Duration>>> {
     let mut differences = Vec::new();
     for f in filters {
         let first = v.iter().filter(|t| (f.first)(t)).collect::<Vec<&Trace>>();
         let last = v.iter().filter(|t| (f.last)(t)).collect::<Vec<&Trace>>();
-        if first.len() != 1 || last.len() != 1 {
+
+        if first.len() != args.tries || last.len() != args.tries {
             return Err(anyhow!(
                 "Your filter functions are not specific or over specific, we got the following number of results: name: {}, first: {}, last: {}",
                 f.name,
@@ -210,24 +247,25 @@ fn find_notable_differences<'a>(
                 last.len()
             ));
         } else {
-            differences.push(Difference {
-                name: f.name,
-                difference: last[0].timestamp - first[0].timestamp,
-            })
+            for (first, last) in first.iter().zip(last.iter()) {
+                differences.push(Difference {
+                    name: f.name,
+                    difference: last.timestamp - first.timestamp,
+                })
+            }
         }
     }
-    Ok(differences)
-}
-
-/// Print the differences
-fn print_differences(args: &Args, diff: Vec<Difference>) {
     let mut hash: HashMap<&str, Vec<Duration>> = HashMap::new();
-    for i in &diff {
+    for i in &differences {
         hash.entry(i.name)
             .and_modify(|v| v.push(i.difference))
             .or_insert(vec![(i.difference)]);
     }
+    Ok(hash)
+}
 
+/// Print the differences
+fn print_differences(args: &Args, hash: HashMap<&str, Vec<Duration>>) {
     for (key, val) in hash.iter() {
         let avg = val
             .iter()
@@ -237,7 +275,24 @@ fn print_differences(args: &Args, diff: Vec<Difference>) {
         let min = val.iter().min().unwrap();
         let max = val.iter().max().unwrap();
         println!("----name avg min max------------------------------");
-        println!("{}: {:?} {:?} {:?}", key, avg, min, max);
+        println!(
+            "{}: {:?} {:?} {:?}",
+            key,
+            avg.yellow().whenever(Condition::TTY_AND_COLOR),
+            min.green().whenever(Condition::TTY_AND_COLOR),
+            max.red().whenever(Condition::TTY_AND_COLOR)
+        );
+    }
+}
+
+/// Print the differences in computer format
+fn print_computer(hash: HashMap<&str, Vec<Duration>>) {
+    for (key, items) in hash.iter() {
+        print!("{key}: ");
+        for i in items {
+            print!("{}.{}, ", i.whole_seconds(), i.whole_microseconds())
+        }
+        println!();
     }
 }
 
@@ -264,11 +319,16 @@ fn main() -> Result<()> {
         }
         println!("----------------------------------------------------------\n\n");
     }
-    let differences = find_notable_differences(traces, &filters).context(
+
+    let differences = find_and_collect_notable_differences(&args, traces, &filters).context(
         "Something went wrong with finding the traces, look up to see what probably went wrong",
     )?;
 
-    print_differences(&args, differences);
+    if !args.computer_output {
+        print_differences(&args, differences);
+    } else {
+        print_computer(differences);
+    }
 
     Ok(())
 }
