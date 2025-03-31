@@ -1,16 +1,15 @@
-use ::time::{Duration, PrimitiveDateTime, format_description};
+use ::time::Duration;
 use anyhow::{Context, Result, anyhow};
-use clap::{Arg, Parser, command};
+use clap::{Parser, command};
 use regex::Regex;
 use std::{
     collections::HashMap,
+    fmt::{Debug, Display, write},
     fs::File,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
     process::Command,
-    sync::LazyLock,
 };
-use time::Time;
 use yansi::{Condition, Paint};
 
 #[derive(Parser, Debug)]
@@ -47,6 +46,18 @@ struct Args {
 }
 
 #[derive(Debug)]
+struct TimeStamp {
+    seconds: u64,
+    micro: u64,
+}
+
+impl Display for TimeStamp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write(f, format_args!("{}.{:.6}", self.seconds, self.micro))
+    }
+}
+
+#[derive(Debug)]
 /// A parsed trace
 struct Trace {
     /// Name of the program, i.e., org.servo.servo
@@ -58,7 +69,11 @@ struct Trace {
     #[allow(clippy::unused)]
     cpu: u64,
     /// timestamp of the trace
-    timestamp: Time,
+    timestamp: TimeStamp,
+    /// No idea what this is
+    tag1: String,
+    /// No idea what this is
+    number: String,
     /// Some shorthand code
     shorthand: String,
     /// Full function name
@@ -168,11 +183,12 @@ fn read_file(args: &Args, f: &Path) -> Result<Vec<Trace>> {
     // This is more specific servo tracing with the tracing_mark_write
     // Example trace: `org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
     let regex = Regex::new(&format!(
-        r"^.({}.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: ........(.*?):(.*?)\s*$",
+        r"^.({}.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: (.)\|(\d+?)\|(.*?):(.*?)\s*$",
         &args.bundle_name
     ))?;
     let f = File::open(f)?;
     let reader = BufReader::new(f);
+
     reader
         .lines()
         .map(|l| l.unwrap())
@@ -193,20 +209,23 @@ fn line_to_trace(regex: &Regex, line: &str) -> Option<Result<Trace>> {
 
 /// Read a regex matched line into a trace
 fn match_to_trace(
-    (_line, [name, pid, cpu, time1, time2, shorthand, line]): (&str, [&str; 7]),
+    (_line, [name, pid, cpu, time1, time2, tag1, number, shorthand, msg]): (&str, [&str; 9]),
 ) -> Result<Trace> {
     let seconds = time1.parse()?;
     let microseconds = time2.parse()?;
-    let timestamp = Time::from_hms(0, 0, 0)?
-        + Duration::seconds(seconds)
-        + Duration::microseconds(microseconds);
+    let timestamp = TimeStamp {
+        seconds,
+        micro: microseconds,
+    };
     Ok(Trace {
         name: name.to_owned(),
         pid: pid.parse().unwrap(),
         cpu: cpu.parse().unwrap(),
+        tag1: tag1.to_string(),
+        number: number.to_string(),
         timestamp,
         shorthand: shorthand.to_owned(),
-        function: line.to_owned(),
+        function: msg.to_owned(),
     })
 }
 
@@ -220,7 +239,7 @@ struct Difference<'a> {
 }
 
 /// Way to construct filters
-struct Filters<'a> {
+struct Filter<'a> {
     /// A name for the filter that will be output
     name: &'a str,
     /// A function taking a trace and deciding if it should be the start of the timing
@@ -229,13 +248,22 @@ struct Filters<'a> {
     last: fn(&Trace) -> bool,
 }
 
+/// Calculates the timestamp difference equaivalent to trace1-trace2
+fn difference_of_traces(trace1: &Trace, trace2: &Trace) -> Duration {
+    Duration::new(
+        trace1.timestamp.seconds as i64 - trace2.timestamp.seconds as i64,
+        (trace1.timestamp.micro as i32 - trace2.timestamp.micro as i32) * 1000,
+    )
+}
+
 /// Look through the traces and find all timing differences coming from the filters
 fn find_and_collect_notable_differences<'a>(
     args: &Args,
-    v: Vec<Trace>,
-    filters: &'a Vec<Filters>,
+    v: &Vec<Trace>,
+    filters: &'a Vec<Filter>,
 ) -> Result<HashMap<&'a str, Vec<Duration>>> {
     let mut differences = Vec::new();
+
     for f in filters {
         let first = v.iter().filter(|t| (f.first)(t)).collect::<Vec<&Trace>>();
         let last = v.iter().filter(|t| (f.last)(t)).collect::<Vec<&Trace>>();
@@ -251,7 +279,7 @@ fn find_and_collect_notable_differences<'a>(
             for (first, last) in first.iter().zip(last.iter()) {
                 differences.push(Difference {
                     name: f.name,
-                    difference: last.timestamp - first.timestamp,
+                    difference: difference_of_traces(&last, &first),
                 })
             }
         }
@@ -266,7 +294,19 @@ fn find_and_collect_notable_differences<'a>(
 }
 
 /// Print the differences
-fn print_differences(args: &Args, hash: HashMap<&str, Vec<Duration>>) {
+fn print_differences(args: &Args, hash: HashMap<&str, Vec<Duration>>, first: &Trace, last: &Trace) {
+    println!(
+        "First stamp {}, last stamp {}",
+        first.timestamp, last.timestamp
+    );
+    println!(
+        "----name {} {} {}------({}) runs (hp:{})------------------------",
+        "avg".yellow(),
+        "min".green(),
+        "max".red(),
+        args.tries,
+        args.homepage
+    );
     for (key, val) in hash.iter() {
         let avg = val
             .iter()
@@ -276,11 +316,7 @@ fn print_differences(args: &Args, hash: HashMap<&str, Vec<Duration>>) {
         let min = val.iter().min().unwrap();
         let max = val.iter().max().unwrap();
         println!(
-            "----name avg min max------({}) runs (hp:{})------------------------",
-            args.tries, args.homepage
-        );
-        println!(
-            "{}: {:?} {:?} {:?}",
+            "{}: {} {} {}",
             key,
             avg.yellow().whenever(Condition::TTY_AND_COLOR),
             min.green().whenever(Condition::TTY_AND_COLOR),
@@ -311,11 +347,19 @@ fn main() -> Result<()> {
         traces.append(&mut new_traces);
     }
 
-    let filters = vec![Filters {
-        name: "Startup",
-        first: |t| t.shorthand == "H" && t.function.contains("panda::JSNApi::PostFork"),
-        last: |t| t.shorthand == "H" && t.function == "PageLoadEndedPrompt",
-    }];
+    let filters = vec![
+        Filter {
+            name: "Startup",
+            first: |t| t.shorthand == "H" && t.function.contains("InitServoCalled"),
+            last: |t| t.shorthand == "H" && t.function.contains("PageLoadEndedPrompt"),
+            //        last: |t| t.shorthand == "H" && t.function == "PageLoadEndedPrompt",
+        },
+        Filter {
+            name: "Startup2",
+            first: |t| t.shorthand == "H" && t.function.contains("on_surface_created_cb"),
+            last: |t| t.shorthand == "H" && t.function.contains("PageLoadEndedPrompt"),
+        },
+    ];
 
     if args.all_traces {
         for i in &traces {
@@ -324,12 +368,14 @@ fn main() -> Result<()> {
         println!("----------------------------------------------------------\n\n");
     }
 
-    let differences = find_and_collect_notable_differences(&args, traces, &filters).context(
+    let differences = find_and_collect_notable_differences(&args, &traces, &filters).context(
         "Something went wrong with finding the traces, look up to see what probably went wrong",
     )?;
 
+    let first = traces.first().unwrap();
+    let last = traces.last().unwrap();
     if !args.computer_output {
-        print_differences(&args, differences);
+        print_differences(&args, differences, first, last);
     } else {
         print_computer(differences);
     }
