@@ -6,7 +6,8 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Display, write},
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Lines},
+    iter::Enumerate,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -130,7 +131,7 @@ fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
 
     // Getting servo pid
     let cmd = Command::new(&hdc)
-        .args(["shell", "pidof", "org.servo.servo"])
+        .args(["shell", "pidof", &args.bundle_name])
         .output()
         .context("did you have org.servo.servo installed on your phone?")?;
     if cmd.stdout.is_empty() {
@@ -182,17 +183,30 @@ fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
 fn read_file(args: &Args, f: &Path) -> Result<Vec<Trace>> {
     // This is more specific servo tracing with the tracing_mark_write
     // Example trace: `org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
+    let bundle_short = args.bundle_name.rsplit('.').next().ok_or(anyhow!("Your bundle name does not have a dot. We need a dot because hitrace sometimes does not show the whole bundle name"))?;
     let regex = Regex::new(&format!(
-        r"^.({}.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: (.)\|(\d+?)\|(.*?):(.*?)\s*$",
-        &args.bundle_name
+        r"^.(.*?{}.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: (.)\|(\d+?)\|(.*?):(.*?)\s*$",
+        &bundle_short
     ))?;
     let f = File::open(f)?;
     let reader = BufReader::new(f);
 
-    reader
+    let (valid_lines, invalid_lines): (Vec<_>, Vec<_>) = reader
         .lines()
-        .map(|l| l.unwrap())
-        .filter_map(|l| line_to_trace(&regex, &l))
+        .enumerate()
+        .partition(|(_index, l)| l.is_ok());
+
+    println!(
+        "Could not read lines {:?}",
+        invalid_lines
+            .iter()
+            .map(|(index, _l)| index)
+            .collect::<Vec<_>>()
+    );
+
+    valid_lines
+        .into_iter()
+        .filter_map(|(_index, l)| line_to_trace(&regex, &l.unwrap()))
         .collect::<Result<Vec<Trace>>>()
         .context("Could not parse one thing")
 }
@@ -348,20 +362,25 @@ fn main() -> Result<()> {
     }
 
     let filters = vec![
+        //Filter {
+        //    name: "Startup",
+        //    first: |t| t.shorthand == "H" && t.function.contains("InitServoCalled"),
+        //    last: |t| t.shorthand == "H" && t.function.contains("PageLoadEndedPrompt"),
+        //},
         Filter {
-            name: "Startup",
-            first: |t| t.shorthand == "H" && t.function.contains("InitServoCalled"),
-            last: |t| t.shorthand == "H" && t.function.contains("PageLoadEndedPrompt"),
-            //        last: |t| t.shorthand == "H" && t.function == "PageLoadEndedPrompt",
+            name: "Surface->LoadStart",
+            first: |t| t.shorthand == "H" && t.function.contains("on_surface_created_cb"),
+            last: |t| t.shorthand == "H" && t.function.contains("load status changed Started"),
         },
         Filter {
-            name: "Startup2",
-            first: |t| t.shorthand == "H" && t.function.contains("on_surface_created_cb"),
+            name: "Load->Compl",
+            first: |t| t.shorthand == "H" && t.function.contains("load status changed Started"),
             last: |t| t.shorthand == "H" && t.function.contains("PageLoadEndedPrompt"),
         },
     ];
 
     if args.all_traces {
+        println!("Printing {} traces", &traces.len());
         for i in &traces {
             println!("{:?}", i);
         }
