@@ -34,7 +34,7 @@ struct Args {
     trace_buffer: u64,
 
     /// Number of sleep seconds
-    #[arg(short, long, default_value_t = 20)]
+    #[arg(short, long, default_value_t = 10)]
     sleep: u64,
 
     /// Stay silent and only return the miliseconds in a list
