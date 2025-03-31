@@ -22,7 +22,7 @@ struct Args {
     all_traces: bool,
 
     /// The number of tries we should have to average
-    #[arg(short, long, default_value_t = 1)]
+    #[arg(short = 'n', long, default_value_t = 1)]
     tries: usize,
 
     /// The homepage we try to load
@@ -30,16 +30,20 @@ struct Args {
     homepage: String,
 
     /// Trace Buffer size in KB
-    #[arg(short = 'b', long, default_value_t = 524288)]
+    #[arg(short = 't', long, default_value_t = 524288)]
     trace_buffer: u64,
 
     /// Number of sleep seconds
-    #[arg(short, long, default_value_t = 5)]
+    #[arg(short, long, default_value_t = 20)]
     sleep: u64,
 
     /// Stay silent and only return the miliseconds in a list
     #[arg(short, long, default_value_t = false)]
     computer_output: bool,
+
+    /// Name of the app bundle to start
+    #[arg(short, long, default_value_t = String::from("org.servo.servo"))]
+    bundle_name: String,
 }
 
 #[derive(Debug)]
@@ -69,7 +73,7 @@ fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
     let hdc = which::which("hdc").context("Is hdc in the path?")?;
     // stop servo
     Command::new(&hdc)
-        .args(["shell", "aa", "force-stop", "org.servo.servo"])
+        .args(["shell", "aa", "force-stop", &args.bundle_name])
         .output()?;
     // start trace
     Command::new(&hdc)
@@ -96,7 +100,7 @@ fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
             "-a",
             "EntryAbility",
             "-b",
-            "org.servo.servo",
+            &args.bundle_name,
             "-U",
             "HOMEPAGE",
             "--ps=--pref",
@@ -159,34 +163,28 @@ fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
     Ok(tmp_path)
 }
 
-/// This regex matches the general tracings with rss_stat.
-/// Example trace: `org.servo.servo-44682   (  44682) [006] .... 17863.362316: rss_stat: mm_id=537018 curr=1 member=2 size=68227072B``
-//static SERVO_TRACE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-//    Regex::new(r"^(.*?servo)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+):(.*)$").unwrap()
-//});
-
-/// This is more specific servo tracing with the tracing_mark_write
-/// Example trace: `org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
-static SERVO_TRACE_POINT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^(.*?servo)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: ........(.*?):(.*?)\s*$").unwrap()
-});
-
 /// Read a file into traces
-fn read_file(f: &Path) -> Result<Vec<Trace>> {
+fn read_file(args: &Args, f: &Path) -> Result<Vec<Trace>> {
+    // This is more specific servo tracing with the tracing_mark_write
+    // Example trace: `org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
+    let regex = Regex::new(&format!(
+        r"^.({}.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: ........(.*?):(.*?)\s*$",
+        &args.bundle_name
+    ))?;
     let f = File::open(f)?;
     let reader = BufReader::new(f);
     reader
         .lines()
         .map(|l| l.unwrap())
-        .filter_map(|l| line_to_trace(&l))
+        .filter_map(|l| line_to_trace(&regex, &l))
         .collect::<Result<Vec<Trace>>>()
         .context("Could not parse one thing")
 }
 
 /// There is always one trace per line
 /// This means that having no matched lines is ok and returns None. Having a parsing error returns Some(Err)
-fn line_to_trace(line: &str) -> Option<Result<Trace>> {
-    SERVO_TRACE_POINT_REGEX
+fn line_to_trace(regex: &Regex, line: &str) -> Option<Result<Trace>> {
+    regex
         .captures_iter(line)
         .map(|c| c.extract())
         .map(match_to_trace)
@@ -309,7 +307,7 @@ fn main() -> Result<()> {
     for i in 1..args.tries + 1 {
         println!("Running test {}", i);
         let log_path = exec_hdc_commands(&args)?;
-        let mut new_traces = read_file(&log_path)?;
+        let mut new_traces = read_file(&args, &log_path)?;
         traces.append(&mut new_traces);
     }
 
