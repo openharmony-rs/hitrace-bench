@@ -53,7 +53,7 @@ struct TimeStamp {
 
 impl Display for TimeStamp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write(f, format_args!("{}.{:.6}", self.seconds, self.micro))
+        write(f, format_args!("{}.{:6}", self.seconds, self.micro))
     }
 }
 
