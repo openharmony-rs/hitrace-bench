@@ -83,6 +83,14 @@ struct Trace {
     function: String,
 }
 
+/// We test if the device is reachable, i.e., the list of hdc list targets is non empty.
+/// It can happen that another IDE is connected to it and then we cannot reach it (and no command fails)
+fn is_device_reachable() -> Result<bool> {
+    let hdc = which::which("hdc").context("Is hdc in the path?")?;
+    let cmd = Command::new(&hdc).args(["list", "targets"]).output()?;
+    Ok(!cmd.stdout.is_empty())
+}
+
 /// We sometimes want to stop the trace because we interrupted the program
 fn stop_tracing(buffer: u64) -> Result<()> {
     let hdc = which::which("hdc").context("Is hdc in the path?")?;
@@ -364,6 +372,10 @@ fn print_computer(hash: HashMap<&str, Vec<Duration>>) {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+
+    if !is_device_reachable().context("Testing reachability of device")? {
+        return Err(anyhow!("No phone seems to be reachable"));
+    }
 
     ctrlc::set_handler(move || {
         stop_tracing(args.trace_buffer).expect("Could not stop tracing");
