@@ -6,8 +6,7 @@ use std::{
     collections::HashMap,
     fmt::{Debug, Display, write},
     fs::File,
-    io::{BufRead, BufReader, Lines},
-    iter::Enumerate,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
     process::Command,
 };
@@ -62,18 +61,21 @@ impl Display for TimeStamp {
 /// A parsed trace
 struct Trace {
     /// Name of the program, i.e., org.servo.servo
+    #[allow(unused)]
     name: String,
     /// pid
-    #[allow(clippy::unused)]
+    #[allow(unused)]
     pid: u64,
     /// the cpu it ran on
-    #[allow(clippy::unused)]
+    #[allow(unused)]
     cpu: u64,
     /// timestamp of the trace
     timestamp: TimeStamp,
     /// No idea what this is
+    #[allow(unused)]
     tag1: String,
     /// No idea what this is
+    #[allow(unused)]
     number: String,
     /// Some shorthand code
     shorthand: String,
@@ -275,7 +277,7 @@ fn difference_of_traces(trace1: &Trace, trace2: &Trace) -> Duration {
 /// Look through the traces and find all timing differences coming from the filters
 fn find_and_collect_notable_differences<'a>(
     args: &Args,
-    v: &Vec<Trace>,
+    v: &[Trace],
     filters: &'a Vec<Filter>,
 ) -> Result<HashMap<&'a str, Vec<Duration>>> {
     let mut differences = Vec::new();
@@ -295,7 +297,7 @@ fn find_and_collect_notable_differences<'a>(
             for (first, last) in first.iter().zip(last.iter()) {
                 differences.push(Difference {
                     name: f.name,
-                    difference: difference_of_traces(&last, &first),
+                    difference: difference_of_traces(last, first),
                 })
             }
         }
