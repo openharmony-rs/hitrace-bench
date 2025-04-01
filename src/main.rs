@@ -196,13 +196,15 @@ fn read_file(args: &Args, f: &Path) -> Result<Vec<Trace>> {
         .enumerate()
         .partition(|(_index, l)| l.is_ok());
 
-    println!(
-        "Could not read lines {:?}",
-        invalid_lines
-            .iter()
-            .map(|(index, _l)| index)
-            .collect::<Vec<_>>()
-    );
+    if !invalid_lines.is_empty() {
+        println!(
+            "Could not read lines {:?}",
+            invalid_lines
+                .iter()
+                .map(|(index, _l)| index)
+                .collect::<Vec<_>>()
+        );
+    }
 
     valid_lines
         .into_iter()
