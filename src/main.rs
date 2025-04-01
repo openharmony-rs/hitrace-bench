@@ -83,6 +83,25 @@ struct Trace {
     function: String,
 }
 
+/// We sometimes want to stop the trace because we interrupted the program
+fn stop_tracing(buffer: u64) -> Result<()> {
+    let hdc = which::which("hdc").context("Is hdc in the path?")?;
+    // stop trace
+    Command::new(&hdc)
+        .args([
+            "shell",
+            "hitrace",
+            "-b",
+            &buffer.to_string(),
+            "--trace_finish",
+            "-o",
+            "/data/local/tmp/ohtrace.txt",
+        ])
+        .output()
+        .map(|_| ())
+        .map_err(|_| anyhow!("Could not stop trace"))
+}
+
 /// Execute the hdc commands on the device.
 fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
     if !args.computer_output {
@@ -152,18 +171,7 @@ fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
             "Servo did not start on the phone or we did not find a pid, is it installed?"
         ));
     }
-    // stop trace
-    Command::new(&hdc)
-        .args([
-            "shell",
-            "hitrace",
-            "-b",
-            &args.trace_buffer.to_string(),
-            "--trace_finish",
-            "-o",
-            "/data/local/tmp/ohtrace.txt",
-        ])
-        .output()?;
+    stop_tracing(args.trace_buffer)?;
     let mut tmp_path = std::env::temp_dir();
     tmp_path.push("servo.ftrace");
     if !args.computer_output {
@@ -356,6 +364,10 @@ fn print_computer(hash: HashMap<&str, Vec<Duration>>) {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+
+    ctrlc::set_handler(move || {
+        stop_tracing(args.trace_buffer).expect("Could not stop tracing");
+    })?;
 
     let mut traces = Vec::new();
     for i in 1..args.tries + 1 {
