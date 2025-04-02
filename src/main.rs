@@ -4,13 +4,16 @@ use clap::{Parser, command};
 use regex::Regex;
 use std::{
     collections::HashMap,
-    fmt::{Debug, Display, write},
+    fmt::Debug,
     fs::File,
     io::{BufRead, BufReader},
-    path::{Path, PathBuf},
-    process::Command,
+    path::Path,
 };
+use trace::Trace;
 use yansi::{Condition, Paint};
+
+mod device;
+mod trace;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -43,158 +46,6 @@ struct Args {
     /// Name of the app bundle to start
     #[arg(short, long, default_value_t = String::from("org.servo.servo"))]
     bundle_name: String,
-}
-
-#[derive(Debug)]
-struct TimeStamp {
-    seconds: u64,
-    micro: u64,
-}
-
-impl Display for TimeStamp {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write(f, format_args!("{}.{:6}", self.seconds, self.micro))
-    }
-}
-
-#[derive(Debug)]
-/// A parsed trace
-struct Trace {
-    /// Name of the program, i.e., org.servo.servo
-    #[allow(unused)]
-    name: String,
-    /// pid
-    #[allow(unused)]
-    pid: u64,
-    /// the cpu it ran on
-    #[allow(unused)]
-    cpu: u64,
-    /// timestamp of the trace
-    timestamp: TimeStamp,
-    /// No idea what this is
-    #[allow(unused)]
-    tag1: String,
-    /// No idea what this is
-    #[allow(unused)]
-    number: String,
-    /// Some shorthand code
-    shorthand: String,
-    /// Full function name
-    function: String,
-}
-
-/// We test if the device is reachable, i.e., the list of hdc list targets is non empty.
-/// It can happen that another IDE is connected to it and then we cannot reach it (and no command fails)
-fn is_device_reachable() -> Result<bool> {
-    let hdc = which::which("hdc").context("Is hdc in the path?")?;
-    let cmd = Command::new(&hdc).args(["list", "targets"]).output()?;
-    Ok(!cmd.stdout.is_empty())
-}
-
-/// We sometimes want to stop the trace because we interrupted the program
-fn stop_tracing(buffer: u64) -> Result<()> {
-    let hdc = which::which("hdc").context("Is hdc in the path?")?;
-    // stop trace
-    Command::new(&hdc)
-        .args([
-            "shell",
-            "hitrace",
-            "-b",
-            &buffer.to_string(),
-            "--trace_finish",
-            "-o",
-            "/data/local/tmp/ohtrace.txt",
-        ])
-        .output()
-        .map(|_| ())
-        .map_err(|_| anyhow!("Could not stop trace"))
-}
-
-/// Execute the hdc commands on the device.
-fn exec_hdc_commands(args: &Args) -> Result<PathBuf> {
-    if !args.computer_output {
-        println!("Executing hdc commands");
-    }
-    let hdc = which::which("hdc").context("Is hdc in the path?")?;
-    // stop servo
-    Command::new(&hdc)
-        .args(["shell", "aa", "force-stop", &args.bundle_name])
-        .output()?;
-    // start trace
-    Command::new(&hdc)
-        .args([
-            "shell",
-            "hitrace",
-            "-b",
-            &args.trace_buffer.to_string(),
-            "app",
-            "graphic",
-            "ohos",
-            "freq",
-            "idle",
-            "memory",
-            "--trace_begin",
-        ])
-        .output()?;
-    // start servo
-    Command::new(&hdc)
-        .args([
-            "shell",
-            "aa",
-            "start",
-            "-a",
-            "EntryAbility",
-            "-b",
-            &args.bundle_name,
-            "-U",
-            "HOMEPAGE",
-            "--ps=--pref",
-            "js_disable_jit=true",
-        ])
-        .output()?;
-
-    if !args.computer_output {
-        println!("Sleeping for {}", args.sleep);
-    }
-    std::thread::sleep(std::time::Duration::from_secs(args.sleep));
-
-    // Getting servo pid
-    let cmd = Command::new(&hdc)
-        .args(["shell", "pidof", &args.bundle_name])
-        .output()
-        .context("did you have org.servo.servo installed on your phone?")?;
-    if cmd.stdout.is_empty() {
-        Command::new(&hdc)
-            .args([
-                "shell",
-                "hitrace",
-                "-b",
-                &args.trace_buffer.to_string(),
-                "--trace_finish",
-                "-o",
-                "/data/local/tmp/ohtrace.txt",
-            ])
-            .output()?;
-        return Err(anyhow!(
-            "Servo did not start on the phone or we did not find a pid, is it installed?"
-        ));
-    }
-    stop_tracing(args.trace_buffer)?;
-    let mut tmp_path = std::env::temp_dir();
-    tmp_path.push("servo.ftrace");
-    if !args.computer_output {
-        println!("Writing ftrace to {}", tmp_path.to_str().unwrap());
-    }
-    // Recieve trace
-    Command::new(&hdc)
-        .args([
-            "file",
-            "recv",
-            "/data/local/tmp/ohtrace.txt",
-            tmp_path.to_str().unwrap(),
-        ])
-        .output()?;
-    Ok(tmp_path)
 }
 
 /// Read a file into traces
@@ -237,30 +88,8 @@ fn line_to_trace(regex: &Regex, line: &str) -> Option<Result<Trace>> {
     regex
         .captures_iter(line)
         .map(|c| c.extract())
-        .map(match_to_trace)
+        .map(trace::match_to_trace)
         .next()
-}
-
-/// Read a regex matched line into a trace
-fn match_to_trace(
-    (_line, [name, pid, cpu, time1, time2, tag1, number, shorthand, msg]): (&str, [&str; 9]),
-) -> Result<Trace> {
-    let seconds = time1.parse()?;
-    let microseconds = time2.parse()?;
-    let timestamp = TimeStamp {
-        seconds,
-        micro: microseconds,
-    };
-    Ok(Trace {
-        name: name.to_owned(),
-        pid: pid.parse().unwrap(),
-        cpu: cpu.parse().unwrap(),
-        tag1: tag1.to_string(),
-        number: number.to_string(),
-        timestamp,
-        shorthand: shorthand.to_owned(),
-        function: msg.to_owned(),
-    })
 }
 
 #[derive(Debug)]
@@ -373,18 +202,18 @@ fn print_computer(hash: HashMap<&str, Vec<Duration>>) {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    if !is_device_reachable().context("Testing reachability of device")? {
+    if !device::is_device_reachable().context("Testing reachability of device")? {
         return Err(anyhow!("No phone seems to be reachable"));
     }
 
     ctrlc::set_handler(move || {
-        stop_tracing(args.trace_buffer).expect("Could not stop tracing");
+        device::stop_tracing(args.trace_buffer).expect("Could not stop tracing");
     })?;
 
     let mut traces = Vec::new();
     for i in 1..args.tries + 1 {
         println!("Running test {}", i);
-        let log_path = exec_hdc_commands(&args)?;
+        let log_path = device::exec_hdc_commands(&args)?;
         let mut new_traces = read_file(&args, &log_path)?;
         traces.append(&mut new_traces);
     }
