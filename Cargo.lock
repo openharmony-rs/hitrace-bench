@@ -87,9 +87,9 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "clap"
-version = "4.5.34"
+version = "4.5.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e958897981290da2a852763fe9cdb89cd36977a5d729023127095fa94d95e2ff"
+checksum = "d8aa86934b44c19c50f87cc2790e19f54f7a67aedb64101c2e1a2e5ecfb73944"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -97,9 +97,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.34"
+version = "4.5.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83b0f35019843db2160b5bb19ae09b4e6411ac33fc6a712003c33e03090e2489"
+checksum = "2414dbb2dd0695280da6ea9261e327479e9d37b0630f6b53ba2a11c60c679fd9"
 dependencies = [
  "anstream",
  "anstyle",
@@ -133,9 +133,9 @@ checksum = "5b63caa9aa9397e2d9480a9b13673856c78d8ac123288526c37d7839f2a86990"
 
 [[package]]
 name = "ctrlc"
-version = "3.4.5"
+version = "3.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90eeab0aa92f3f9b4e87f258c72b139c207d251f9cbc1080a0086b86a8870dd3"
+checksum = "697b5419f348fd5ae2478e8018cb016c00a5881c7f46c717de98ffd135a5651c"
 dependencies = [
  "nix",
  "windows-sys",
@@ -183,6 +183,19 @@ name = "hermit-abi"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fbd780fe5cc30f81464441920d82ac8740e2e46b29a6fad543ddd075229ce37e"
+
+[[package]]
+name = "hitrace-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "ctrlc",
+ "regex",
+ "time",
+ "which",
+ "yansi",
+]
 
 [[package]]
 name = "is-terminal"
@@ -239,9 +252,9 @@ checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
 
 [[package]]
 name = "once_cell"
-version = "1.21.2"
+version = "1.21.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2806eaa3524762875e21c3dcd057bc4b7bfa01ce4da8d46be1cd43649e1cc6b"
+checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "powerfmt"
@@ -327,19 +340,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "servo-bench"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "ctrlc",
- "regex",
- "time",
- "which",
- "yansi",
 ]
 
 [[package]]
