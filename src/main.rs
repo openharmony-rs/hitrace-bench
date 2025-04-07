@@ -2,6 +2,7 @@ use ::time::Duration;
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, command};
 use regex::Regex;
+use serde_json::Value;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -46,6 +47,10 @@ struct Args {
     /// Name of the app bundle to start
     #[arg(short, long, default_value_t = String::from("org.servo.servo"))]
     bundle_name: String,
+
+    /// Use Bencher output format
+    #[arg(long, default_value_t = false)]
+    bencher: bool,
 }
 
 /// Read a file into traces
@@ -199,6 +204,12 @@ fn print_computer(hash: HashMap<&str, Vec<Duration>>) {
     }
 }
 
+/// Output in bencher json format
+fn print_bencher(hash: HashMap<&str, Vec<Duration>>) {
+    let r = serde_json::to_string(&hash).unwrap();
+    println!("{}", r);
+}
+
 fn main() -> Result<()> {
     let args = Args::parse();
 
@@ -250,10 +261,12 @@ fn main() -> Result<()> {
 
     let first = traces.first().unwrap();
     let last = traces.last().unwrap();
-    if !args.computer_output {
-        print_differences(&args, differences, first, last);
-    } else {
+    if args.computer_output {
         print_computer(differences);
+    } else if args.bencher {
+        print_bencher(differences);
+    } else {
+        print_differences(&args, differences, first, last);
     }
 
     Ok(())
