@@ -1,7 +1,6 @@
+//! Functions to handle the device
 use anyhow::{Context, Result, anyhow};
 use std::{path::PathBuf, process::Command};
-
-/// Functions to handle the device
 
 /// We test if the device is reachable, i.e., the list of hdc list targets is non empty.
 /// It can happen that another IDE is connected to it and then we cannot reach it (and no command fails)

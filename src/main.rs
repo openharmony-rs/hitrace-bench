@@ -2,7 +2,7 @@ use ::time::Duration;
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, command};
 use regex::Regex;
-use serde_json::Value;
+use serde::Serialize;
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -97,13 +97,28 @@ fn line_to_trace(regex: &Regex, line: &str) -> Option<Result<Trace>> {
         .next()
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 /// the difference in timing, represented by two integers, representing major and minor difference
 struct Difference<'a> {
     /// Major and minor differences
+    #[serde(serialize_with = "custom_duration_serialize")]
     difference: Duration,
     /// The name of the difference
     name: &'a str,
+}
+
+fn custom_duration_serialize<S>(
+    dur: &Duration,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_str(&format!(
+        "{}.{:4}",
+        dur.whole_seconds(),
+        dur.whole_milliseconds()
+    ))
 }
 
 /// Way to construct filters

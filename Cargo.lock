@@ -193,6 +193,7 @@ dependencies = [
  "clap",
  "ctrlc",
  "regex",
+ "serde",
  "serde_json",
  "time",
  "which",
