@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/openharmony-rs/hitrace-bench"
 description = "Allows benching of servo on ohos using the hitrace library."
-
+license = "Apache-2.0"
 
 [dependencies]
 anyhow = "1.0.98"
