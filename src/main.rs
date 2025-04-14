@@ -2,12 +2,13 @@ use ::time::Duration;
 use anyhow::{Context, Result, anyhow};
 use clap::{Parser, command};
 use regex::Regex;
+use rust_decimal::Decimal;
 use serde::Serialize;
 use std::{
     collections::HashMap,
     fmt::Debug,
     fs::File,
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, BufWriter},
     path::Path,
 };
 use trace::Trace;
@@ -49,7 +50,7 @@ struct Args {
     bundle_name: String,
 
     /// Use Bencher output format
-    #[arg(long, default_value_t = false)]
+    #[arg(long, default_value_t = true)]
     bencher: bool,
 }
 
@@ -101,24 +102,9 @@ fn line_to_trace(regex: &Regex, line: &str) -> Option<Result<Trace>> {
 /// the difference in timing, represented by two integers, representing major and minor difference
 struct Difference<'a> {
     /// Major and minor differences
-    #[serde(serialize_with = "custom_duration_serialize")]
     difference: Duration,
     /// The name of the difference
     name: &'a str,
-}
-
-fn custom_duration_serialize<S>(
-    dur: &Duration,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    serializer.serialize_str(&format!(
-        "{}.{:4}",
-        dur.whole_seconds(),
-        dur.whole_milliseconds()
-    ))
 }
 
 /// Way to construct filters
@@ -219,10 +205,40 @@ fn print_computer(hash: HashMap<&str, Vec<Duration>>) {
     }
 }
 
+#[derive(Serialize)]
+struct latency {
+    #[serde(with = "rust_decimal::serde::float")]
+    value: Decimal,
+    #[serde(with = "rust_decimal::serde::float")]
+    lower_value: Decimal,
+    #[serde(with = "rust_decimal::serde::float")]
+    upper_value: Decimal,
+}
+
 /// Output in bencher json format
 fn print_bencher(hash: HashMap<&str, Vec<Duration>>) {
-    let r = serde_json::to_string(&hash).unwrap();
-    println!("{}", r);
+    let b: HashMap<&str, HashMap<&str, latency>> = hash
+        .into_iter()
+        .map(|(key, dur_vec)| {
+            let number = dur_vec[0].whole_seconds() * 100 + dur_vec[0].whole_milliseconds() as i64;
+            let value = Decimal::new(number, 3);
+            let mut map = HashMap::new();
+            map.insert(
+                "latency",
+                latency {
+                    value,
+                    lower_value: value,
+                    upper_value: value,
+                },
+            );
+            (key, map)
+        })
+        .collect();
+    //let r = serde_json::to_string(&b).unwrap();
+    //println!("{}", r);
+    let file = File::create("bench.json").expect("Could not create file");
+    let writer = BufWriter::new(file);
+    serde_json::to_writer_pretty(writer, &b).expect("Could not write json");
 }
 
 fn main() -> Result<()> {
@@ -238,7 +254,9 @@ fn main() -> Result<()> {
 
     let mut traces = Vec::new();
     for i in 1..args.tries + 1 {
-        println!("Running test {}", i);
+        if !args.bencher {
+            println!("Running test {}", i);
+        }
         let log_path = device::exec_hdc_commands(&args)?;
         let mut new_traces = read_file(&args, &log_path)?;
         traces.append(&mut new_traces);

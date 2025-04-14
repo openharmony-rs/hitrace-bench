@@ -51,6 +51,7 @@ pub(crate) struct Trace {
     /// timestamp of the trace
     pub(crate) timestamp: TimeStamp,
     /// Tells us if the trace ended and when
+    #[allow(unused)]
     pub(crate) trace_marker: TraceMarker,
     /// No idea what this is
     #[allow(unused)]
