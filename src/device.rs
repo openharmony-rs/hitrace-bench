@@ -66,7 +66,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
             "-b",
             &args.bundle_name,
             "-U",
-            "HOMEPAGE",
+            &args.homepage,
             "--ps=--pref",
             "js_disable_jit=true",
         ])
