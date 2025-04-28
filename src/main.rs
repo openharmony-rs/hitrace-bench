@@ -206,7 +206,7 @@ fn print_computer(hash: HashMap<&str, Vec<Duration>>) {
 }
 
 #[derive(Serialize)]
-struct latency {
+struct Latency {
     #[serde(with = "rust_decimal::serde::float")]
     value: Decimal,
     #[serde(with = "rust_decimal::serde::float")]
@@ -217,7 +217,7 @@ struct latency {
 
 /// Output in bencher json format
 fn print_bencher(hash: HashMap<&str, Vec<Duration>>) {
-    let b: HashMap<&str, HashMap<&str, latency>> = hash
+    let b: HashMap<&str, HashMap<&str, Latency>> = hash
         .into_iter()
         .map(|(key, dur_vec)| {
             let number = dur_vec[0].whole_seconds() * 100 + dur_vec[0].whole_milliseconds() as i64;
@@ -225,7 +225,7 @@ fn print_bencher(hash: HashMap<&str, Vec<Duration>>) {
             let mut map = HashMap::new();
             map.insert(
                 "latency",
-                latency {
+                Latency {
                     value,
                     lower_value: value,
                     upper_value: value,
