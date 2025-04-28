@@ -35,7 +35,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         println!("Executing hdc commands");
     }
     let hdc = which::which("hdc").context("Is hdc in the path?")?;
-    // stop servo
+    // stop the app before starting the test
     Command::new(&hdc)
         .args(["shell", "aa", "force-stop", &args.bundle_name])
         .output()?;
@@ -55,7 +55,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
             "--trace_begin",
         ])
         .output()?;
-    // start servo
+    // start the ability
     Command::new(&hdc)
         .args([
             "shell",
@@ -77,11 +77,11 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
     }
     std::thread::sleep(std::time::Duration::from_secs(args.sleep));
 
-    // Getting servo pid
+    // Getting app pid is a simple test if the app perhaps crashed during the benchmark / test.
     let cmd = Command::new(&hdc)
         .args(["shell", "pidof", &args.bundle_name])
         .output()
-        .context("did you have org.servo.servo installed on your phone?")?;
+        .with_context(|| format!("Is `{}` installed?", args.bundle_name))?;
     if cmd.stdout.is_empty() {
         Command::new(&hdc)
             .args([
@@ -95,16 +95,16 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
             ])
             .output()?;
         return Err(anyhow!(
-            "Servo did not start on the phone or we did not find a pid, is it installed?"
+            "{} did not start or crashed. Please check the application logs.", args.bundle_name
         ));
     }
     stop_tracing(args.trace_buffer)?;
     let mut tmp_path = std::env::temp_dir();
-    tmp_path.push("servo.ftrace");
+    tmp_path.push("app.ftrace");
     if !args.computer_output && !args.bencher {
         println!("Writing ftrace to {}", tmp_path.to_str().unwrap());
     }
-    // Recieve trace
+    // Receive trace
     Command::new(&hdc)
         .args([
             "file",
