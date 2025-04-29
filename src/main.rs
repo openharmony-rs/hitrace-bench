@@ -50,7 +50,7 @@ struct Args {
     bundle_name: String,
 
     /// Use Bencher output format
-    #[arg(long, default_value_t = true)]
+    #[arg(long, default_value_t = false)]
     bencher: bool,
 }
 
