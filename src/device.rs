@@ -95,7 +95,8 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
             ])
             .output()?;
         return Err(anyhow!(
-            "{} did not start or crashed. Please check the application logs.", args.bundle_name
+            "{} did not start or crashed. Please check the application logs.",
+            args.bundle_name
         ));
     }
     stop_tracing(args.trace_buffer)?;
