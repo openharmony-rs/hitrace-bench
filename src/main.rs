@@ -43,7 +43,7 @@ fn print_differences(args: &Args, results: RunResults, errors: HashMap<&str, u32
             avg.yellow().whenever(Condition::TTY_AND_COLOR),
             min.green().whenever(Condition::TTY_AND_COLOR),
             max.red().whenever(Condition::TTY_AND_COLOR),
-            val.iter().count(),
+            val.len(),
         );
     }
 }
@@ -85,19 +85,19 @@ fn write_bencher(result: RunResults) {
     let b: HashMap<&str, HashMap<&str, Latency>> = result
         .into_iter()
         .map(|(key, dur_vec)| {
-            let avg = dur_vec.iter().sum::<Duration>() / dur_vec.iter().count() as f64;
+            let avg = dur_vec.iter().sum::<Duration>() / dur_vec.len() as f64;
             let lower = dur_vec.iter().min();
             let upper = dur_vec.iter().max();
 
             // yes we need this hashmap for the correct json
             let mut map = HashMap::new();
-            if lower.is_some() && upper.is_some() {
+            if let Some((lower, upper)) = lower.zip(upper) {
                 map.insert(
                     "latency",
                     Latency {
                         value: difference_to_bencher_decimal(&avg),
-                        lower_value: difference_to_bencher_decimal(lower.unwrap()),
-                        upper_value: difference_to_bencher_decimal(upper.unwrap()),
+                        lower_value: difference_to_bencher_decimal(lower),
+                        upper_value: difference_to_bencher_decimal(upper),
                     },
                 );
             }
