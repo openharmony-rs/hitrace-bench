@@ -1,6 +1,7 @@
-use anyhow::{Result, anyhow};
 /// Functions about the traces
+use anyhow::{Result, anyhow};
 use std::fmt::{Debug, Display, write};
+use time::Duration;
 
 #[derive(Debug)]
 pub(crate) struct TimeStamp {
@@ -24,7 +25,7 @@ pub(crate) enum TraceMarker {
 }
 
 impl TraceMarker {
-    fn from(val: &str) -> Result<Self> {
+    pub(crate) fn from(val: &str) -> Result<Self> {
         match val {
             "B" => Ok(TraceMarker::StartSync),
             "E" => Ok(TraceMarker::EndSync),
@@ -62,38 +63,10 @@ pub(crate) struct Trace {
     pub(crate) function: String,
 }
 
-/// Read a regex matched line into a trace
-pub(crate) fn match_to_trace(
-    (
-        _line,
-        [
-            name,
-            pid,
-            cpu,
-            time1,
-            time2,
-            trace_marker,
-            number,
-            shorthand,
-            msg,
-        ],
-    ): (&str, [&str; 9]),
-) -> Result<Trace> {
-    let seconds = time1.parse()?;
-    let microseconds = time2.parse()?;
-    let timestamp = TimeStamp {
-        seconds,
-        micro: microseconds,
-    };
-    let trace_marker = TraceMarker::from(trace_marker)?;
-    Ok(Trace {
-        name: name.to_owned(),
-        pid: pid.parse().unwrap(),
-        cpu: cpu.parse().unwrap(),
-        trace_marker,
-        number: number.to_string(),
-        timestamp,
-        shorthand: shorthand.to_owned(),
-        function: msg.to_owned(),
-    })
+/// Calculates the timestamp difference equaivalent to trace1-trace2
+pub(crate) fn difference_of_traces(trace1: &Trace, trace2: &Trace) -> Duration {
+    Duration::new(
+        trace1.timestamp.seconds as i64 - trace2.timestamp.seconds as i64,
+        (trace1.timestamp.micro as i32 - trace2.timestamp.micro as i32) * 1000,
+    )
 }
