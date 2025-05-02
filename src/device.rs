@@ -1,6 +1,17 @@
 //! Functions to handle the device
 use anyhow::{Context, Result, anyhow};
-use std::{path::PathBuf, process::Command};
+use regex::Regex;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+    path::{Path, PathBuf},
+    process::Command,
+};
+
+use crate::{
+    Args, Trace,
+    trace::{TimeStamp, TraceMarker},
+};
 
 /// We test if the device is reachable, i.e., the list of hdc list targets is non empty.
 /// It can happen that another IDE is connected to it and then we cannot reach it (and no command fails)
@@ -115,4 +126,84 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         ])
         .output()?;
     Ok(tmp_path)
+}
+
+/// There is always one trace per line
+/// This means that having no matched lines is ok and returns None. Having a parsing error returns Some(Err)
+fn line_to_trace(regex: &Regex, line: &str) -> Option<Result<Trace>> {
+    regex
+        .captures_iter(line)
+        .map(|c| c.extract())
+        .map(match_to_trace)
+        .next()
+}
+
+/// Read a regex matched line into a trace
+fn match_to_trace(
+    (
+        _line,
+        [
+            name,
+            pid,
+            cpu,
+            time1,
+            time2,
+            trace_marker,
+            number,
+            shorthand,
+            msg,
+        ],
+    ): (&str, [&str; 9]),
+) -> Result<Trace> {
+    let seconds = time1.parse()?;
+    let microseconds = time2.parse()?;
+    let timestamp = TimeStamp {
+        seconds,
+        micro: microseconds,
+    };
+    let trace_marker = TraceMarker::from(trace_marker)?;
+    Ok(Trace {
+        name: name.to_owned(),
+        pid: pid.parse().unwrap(),
+        cpu: cpu.parse().unwrap(),
+        trace_marker,
+        number: number.to_string(),
+        timestamp,
+        shorthand: shorthand.to_owned(),
+        function: msg.to_owned(),
+    })
+}
+
+/// Read a file into traces
+pub(crate) fn read_file(args: &Args, f: &Path) -> Result<Vec<Trace>> {
+    // This is more specific servo tracing with the tracing_mark_write
+    // Example trace: `org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
+    let bundle_short = args.bundle_name.rsplit('.').next().ok_or(anyhow!("Your bundle name does not have a dot. We need a dot because hitrace sometimes does not show the whole bundle name"))?;
+    let regex = Regex::new(&format!(
+        r"^.(.*?{}.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: (.)\|(\d+?)\|(.*?):(.*?)\s*$",
+        &bundle_short
+    ))?;
+    let f = File::open(f)?;
+    let reader = BufReader::new(f);
+
+    let (valid_lines, invalid_lines): (Vec<_>, Vec<_>) = reader
+        .lines()
+        .enumerate()
+        .partition(|(_index, l)| l.is_ok());
+
+    if !invalid_lines.is_empty() {
+        println!(
+            "Could not read lines {:?}",
+            invalid_lines
+                .iter()
+                .map(|(index, _l)| index)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    valid_lines
+        .into_iter()
+        .filter_map(|(_index, l)| line_to_trace(&regex, &l.unwrap()))
+        .collect::<Result<Vec<Trace>>>()
+        .context("Could not parse one thing")
 }
