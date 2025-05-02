@@ -14,6 +14,27 @@ mod device;
 mod filter;
 mod trace;
 
+struct AvgMingMax {
+    avg: Duration,
+    min: Duration,
+    max: Duration,
+    number: usize,
+}
+
+fn avg_min_max(durations: &[Duration]) -> Option<AvgMingMax> {
+    let number = durations.len();
+    durations
+        .iter()
+        .min()
+        .zip(durations.iter().max())
+        .map(|(min, max)| AvgMingMax {
+            avg: durations.iter().sum::<Duration>() / number as f64,
+            min: *min,
+            max: *max,
+            number,
+        })
+}
+
 /// Print the differences
 fn print_differences(args: &Args, results: RunResults, errors: HashMap<&str, u32>) {
     println!("The following things broke with errors");
@@ -30,21 +51,18 @@ fn print_differences(args: &Args, results: RunResults, errors: HashMap<&str, u32
         args.homepage
     );
     for (key, val) in results.iter() {
-        let avg = val
-            .iter()
-            .sum::<Duration>()
-            .checked_div(args.tries as i32)
-            .unwrap();
-        let min = val.iter().min().unwrap();
-        let max = val.iter().max().unwrap();
-        println!(
-            "{}: {} {} {}  ({} runs)",
-            key,
-            avg.yellow().whenever(Condition::TTY_AND_COLOR),
-            min.green().whenever(Condition::TTY_AND_COLOR),
-            max.red().whenever(Condition::TTY_AND_COLOR),
-            val.len(),
-        );
+        if let Some(avg_min_max) = avg_min_max(val) {
+            println!(
+                "{}: {} {} {}  ({} runs)",
+                key,
+                avg_min_max.avg.yellow().whenever(Condition::TTY_AND_COLOR),
+                avg_min_max.min.green().whenever(Condition::TTY_AND_COLOR),
+                avg_min_max.max.red().whenever(Condition::TTY_AND_COLOR),
+                avg_min_max.number,
+            );
+        } else {
+            println!("{}: _ _ _  (0 runs)", key);
+        }
     }
 }
 
@@ -85,19 +103,16 @@ fn write_bencher(result: RunResults) {
     let b: HashMap<&str, HashMap<&str, Latency>> = result
         .into_iter()
         .map(|(key, dur_vec)| {
-            let avg = dur_vec.iter().sum::<Duration>() / dur_vec.len() as f64;
-            let lower = dur_vec.iter().min();
-            let upper = dur_vec.iter().max();
-
+            let avg_min_max = avg_min_max(&dur_vec);
             // yes we need this hashmap for the correct json
             let mut map = HashMap::new();
-            if let Some((lower, upper)) = lower.zip(upper) {
+            if let Some(avg_min_max) = avg_min_max {
                 map.insert(
                     "latency",
                     Latency {
-                        value: difference_to_bencher_decimal(&avg),
-                        lower_value: difference_to_bencher_decimal(lower),
-                        upper_value: difference_to_bencher_decimal(upper),
+                        value: difference_to_bencher_decimal(&avg_min_max.avg),
+                        lower_value: difference_to_bencher_decimal(&avg_min_max.min),
+                        upper_value: difference_to_bencher_decimal(&avg_min_max.max),
                     },
                 );
             }
