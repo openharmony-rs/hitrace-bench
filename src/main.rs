@@ -81,7 +81,7 @@ fn print_computer(hash: RunResults) {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 /// Struct for bencher json
 struct Latency {
     #[serde(with = "rust_decimal::serde::float")]
@@ -94,7 +94,7 @@ struct Latency {
 
 /// Converts duration to bencher Decimal representation
 fn difference_to_bencher_decimal(dur: &Duration) -> Decimal {
-    let number = dur.whole_seconds() * 100 + dur.whole_milliseconds() as i64;
+    let number = dur.whole_nanoseconds() as i64;
     Decimal::new(number, 3)
 }
 
@@ -121,6 +121,7 @@ fn write_bencher(result: RunResults) {
         .collect();
     let file = File::create("bench.json").expect("Could not create file");
     let writer = BufWriter::new(file);
+    print!("{:?}", b);
     serde_json::to_writer_pretty(writer, &b).expect("Could not write json");
 }
 
