@@ -177,12 +177,10 @@ fn match_to_trace(
 /// Read a file into traces
 pub(crate) fn read_file(args: &Args, f: &Path) -> Result<Vec<Trace>> {
     // This is more specific servo tracing with the tracing_mark_write
-    // Example trace: `org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
-    let bundle_short = args.bundle_name.rsplit('.').next().ok_or(anyhow!("Your bundle name does not have a dot. We need a dot because hitrace sometimes does not show the whole bundle name"))?;
-    let regex = Regex::new(&format!(
-        r"^.(.*?{}.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: (.)\|(\d+?)\|(.*?):(.*?)\s*$",
-        &bundle_short
-    ))?;
+    // Example trace: ` org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
+    let regex = Regex::new(
+        r"^\s*(.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: (.)\|(\d+?)\|(.*?):(.*)\s*$",
+    ).expect("Could not read regex");
     let f = File::open(f)?;
     let reader = BufReader::new(f);
 
