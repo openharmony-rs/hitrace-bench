@@ -40,7 +40,7 @@ impl TraceMarker {
 #[derive(Debug)]
 /// A parsed trace
 pub(crate) struct Trace {
-    /// Name of the program, i.e., org.servo.servo
+    /// Name of the thread, i.e., `org.servo.servo`` or `Constellation`
     #[allow(unused)]
     pub(crate) name: String,
     /// pid

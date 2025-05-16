@@ -123,24 +123,23 @@ fn write_bencher(result: RunResults) {
     let writer = BufWriter::new(file);
     print!("{:?}", b);
     serde_json::to_writer_pretty(writer, &b).expect("Could not write json");
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&b).expect("Could not serialize")
+    );
 }
 
 fn main() -> Result<()> {
     let filters = vec![
-        //Filter {
-        //    name: "Startup",
-        //    first: |t| t.shorthand == "H" && t.function.contains("InitServoCalled"),
-        //    last: |t| t.shorthand == "H" && t.function.contains("PageLoadEndedPrompt"),
-        //},
         Filter {
             name: "Surface->LoadStart",
-            first: |t| t.shorthand == "H" && t.function.contains("on_surface_created_cb"),
-            last: |t| t.shorthand == "H" && t.function.contains("load status changed Started"),
+            first: |t| t.function.contains("on_surface_created_cb"),
+            last: |t| t.function.contains("load status changed Head"),
         },
         Filter {
             name: "Load->Compl",
-            first: |t| t.shorthand == "H" && t.function.contains("load status changed Started"),
-            last: |t| t.shorthand == "H" && t.function.contains("PageLoadEndedPrompt"),
+            first: |t| t.function.contains("load status changed Head"),
+            last: |t| t.function.contains("PageLoadEndedPrompt"),
         },
     ];
 
