@@ -3,7 +3,7 @@ use std::{collections::HashMap, fs::OpenOptions, io::BufWriter};
 use rust_decimal::Decimal;
 use time::Duration;
 
-use crate::{Args, Latency, RunResults, avg_min_max};
+use crate::{Latency, RunResults, avg_min_max};
 
 /// Converts duration to bencher Decimal representation
 fn difference_to_bencher_decimal(dur: &Duration) -> Decimal {
@@ -14,7 +14,7 @@ fn difference_to_bencher_decimal(dur: &Duration) -> Decimal {
 /// Output in bencher json format to bench.json
 /// We also will append it to the bench.json file instead of overwriting it so supsequent runs can be recorded.
 /// We also add some custom strings to the filter.
-pub(crate) fn write_results(args: &Args, result: RunResults) {
+pub(crate) fn write_results(result: RunResults) {
     let b: HashMap<String, HashMap<&str, Latency>> = result
         .into_iter()
         .map(|(key, dur_vec)| {
@@ -31,15 +31,13 @@ pub(crate) fn write_results(args: &Args, result: RunResults) {
                     },
                 );
             }
-
-            let new_key = format!("E2E/{}/{}", args.url, key);
-            (new_key, map)
+            (key, map)
         })
         .collect();
 
     let file = OpenOptions::new()
         .create(true)
-        .append(true)
+        .truncate(true)
         .open("bench.json")
         .expect("Could not open file");
     let writer = BufWriter::new(file);

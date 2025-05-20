@@ -1,6 +1,6 @@
 [package]
 name = "hitrace-bench"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 repository = "https://github.com/openharmony-rs/hitrace-bench"
 description = "Allows benching of servo on ohos using the hitrace library."
