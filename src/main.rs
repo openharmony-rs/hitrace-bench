@@ -39,7 +39,7 @@ fn avg_min_max(durations: &[Duration]) -> Option<AvgMingMax> {
 }
 
 /// Print the differences
-fn print_differences(args: &Args, results: RunResults, errors: HashMap<&str, u32>) {
+fn print_differences(args: &Args, results: RunResults, errors: HashMap<String, u32>) {
     println!("The following things broke with errors");
     for (key, val) in errors.iter() {
         println!("{}: {} errors", key, val);
@@ -71,7 +71,7 @@ fn print_differences(args: &Args, results: RunResults, errors: HashMap<&str, u32
 
 /// The results of a run given by filter.name, Vec<duration>
 /// Notice that not all vectors will have the same length as some runs might fail.
-type RunResults<'a> = HashMap<&'a str, Vec<Duration>>;
+type RunResults = HashMap<String, Vec<Duration>>;
 
 #[derive(Debug, Serialize)]
 /// Struct for bencher json
@@ -84,42 +84,53 @@ struct Latency {
     upper_value: Decimal,
 }
 
-/// runs a RunConfig
-fn run_runconfig(run_config: &RunConfig) -> Result<()> {
-    let mut results: HashMap<&str, Vec<Duration>> = HashMap::new();
-    let mut errors: HashMap<&str, u32> = HashMap::new();
+/// Runs runconfigs
+/// Bencher has to be treated separately because it wants a valid json output.
+fn run_runconfig(run_configs: &Vec<RunConfig>, use_bencher: bool) -> Result<()> {
+    let mut results: HashMap<String, Vec<Duration>> = HashMap::new();
+    let mut errors: HashMap<String, u32> = HashMap::new();
+    for run_config in run_configs {
+        for i in 1..run_config.args.tries + 1 {
+            if !run_config.args.bencher {
+                println!("Running test {}", i);
+            }
+            let log_path = device::exec_hdc_commands(&run_config.args)?;
+            let traces = device::read_file(&log_path)?;
+            let differences = filter::find_notable_differences(&traces, &run_config.filters);
+            for (original_key, value) in differences.into_iter() {
+                let key = if use_bencher {
+                    let new_key = format!("E2E/{}/{}", run_config.args.url, original_key);
+                    new_key
+                } else {
+                    original_key.to_owned()
+                };
+                if let Ok(d) = value {
+                    results
+                        .entry(key)
+                        .and_modify(|v| v.push(d))
+                        .or_insert(vec![(d)]);
+                } else {
+                    errors.entry(key).and_modify(|v| *v += 1).or_insert(1);
+                }
+            }
 
-    for i in 1..run_config.args.tries + 1 {
-        if !run_config.args.bencher {
-            println!("Running test {}", i);
-        }
-        let log_path = device::exec_hdc_commands(&run_config.args)?;
-        let traces = device::read_file(&log_path)?;
-        let differences = filter::find_notable_differences(&traces, &run_config.filters);
-        for (key, value) in differences.iter() {
-            if let Ok(d) = value {
-                results
-                    .entry(key)
-                    .and_modify(|v| v.push(*d))
-                    .or_insert(vec![(*d)]);
-            } else {
-                errors.entry(key).and_modify(|v| *v += 1).or_insert(1);
+            if run_config.args.tries == 1 && run_config.args.all_traces {
+                println!("Printing {} traces", &traces.len());
+                for i in &traces {
+                    println!("{:?}", i);
+                }
+                println!("----------------------------------------------------------\n\n");
             }
         }
-
-        if run_config.args.tries == 1 && run_config.args.all_traces {
-            println!("Printing {} traces", &traces.len());
-            for i in &traces {
-                println!("{:?}", i);
-            }
-            println!("----------------------------------------------------------\n\n");
+        if !use_bencher {
+            print_differences(&run_config.args, results, errors);
+            results = HashMap::new();
+            errors = HashMap::new();
         }
     }
 
-    if run_config.args.bencher {
-        bencher::write_results(&run_config.args, results)
-    } else {
-        print_differences(&run_config.args, results, errors)
+    if use_bencher {
+        bencher::write_results(results)
     }
     Ok(())
 }
@@ -158,13 +169,19 @@ fn main() -> Result<()> {
         .expect("Need at least one RunConfig")
         .args
         .trace_buffer;
+
+    let all_bencher = run_configs.iter().all(|r| r.args.bencher);
+    let all_print = run_configs.iter().all(|r| !r.args.bencher);
+    if !all_bencher && !all_print {
+        println!("We only support all bencher or all print runs");
+        return Ok(());
+    }
+
     ctrlc::set_handler(move || {
         device::stop_tracing(trace_buffer).expect("Could not stop tracing");
     })?;
 
-    for run_config in run_configs {
-        run_runconfig(&run_config)?;
-    }
+    run_runconfig(&run_configs, all_bencher)?;
 
     Ok(())
 }
