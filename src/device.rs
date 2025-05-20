@@ -67,21 +67,26 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         ])
         .output()?;
     // start the ability
-    Command::new(&hdc)
-        .args([
-            "shell",
-            "aa",
-            "start",
-            "-a",
-            "EntryAbility",
-            "-b",
-            &args.bundle_name,
-            "-U",
-            &args.homepage,
-            "--ps=--pref",
-            "js_disable_jit=true",
-        ])
-        .output()?;
+    let mut cmd_args = vec![
+        "shell",
+        "aa",
+        "start",
+        "-a",
+        "EntryAbility",
+        "-b",
+        &args.bundle_name,
+        "-U",
+        &args.url,
+        "--ps=--pref",
+        "js_disable_jit=true",
+        "--ps=--tracing-filter",
+        "trace",
+    ];
+    if let Some(ref v) = args.commands {
+        let mut v = v.iter().map(|s| s.as_str()).collect();
+        cmd_args.append(&mut v);
+    }
+    Command::new(&hdc).args(cmd_args).output()?;
 
     if !args.computer_output && !args.bencher {
         println!("Sleeping for {}", args.sleep);
@@ -175,7 +180,7 @@ fn match_to_trace(
 }
 
 /// Read a file into traces
-pub(crate) fn read_file(args: &Args, f: &Path) -> Result<Vec<Trace>> {
+pub(crate) fn read_file(f: &Path) -> Result<Vec<Trace>> {
     // This is more specific servo tracing with the tracing_mark_write
     // Example trace: ` org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
     let regex = Regex::new(

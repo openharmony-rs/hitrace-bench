@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 
 #[derive(Parser, Debug)]
@@ -13,8 +15,8 @@ pub(crate) struct Args {
     pub(crate) tries: usize,
 
     /// The homepage we try to load
-    #[arg(short = 'p', long, default_value_t = String::from("https://servo.org"))]
-    pub(crate) homepage: String,
+    #[arg(short, long, default_value_t = String::from("https://servo.org"))]
+    pub(crate) url: String,
 
     /// Trace Buffer size in KB
     #[arg(short = 't', long, default_value_t = 524288)]
@@ -32,7 +34,16 @@ pub(crate) struct Args {
     #[arg(short, long, default_value_t = String::from("org.servo.servo"))]
     pub(crate) bundle_name: String,
 
-    /// Use Bencher output format
+    /// Use Bencher output format. This also does a couple of other things.
+    /// See the description in `bencher.rs`
     #[arg(long, default_value_t = false)]
     pub(crate) bencher: bool,
+
+    /// A json file describing the filters
+    #[arg(short, long)]
+    pub(crate) filter_file: Option<PathBuf>,
+
+    /// These will be directly given to the hdc shell start command at the end.
+    #[arg(long, trailing_var_arg(true), allow_hyphen_values(true), num_args=0..)]
+    pub(crate) commands: Option<Vec<String>>,
 }
