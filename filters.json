@@ -1,0 +1,7 @@
+[
+	{ 
+		"name": "Load",
+		"start_fn_partial": "on_surface_created_cb",
+		"end_fn_partial": "PageLoadEndedPrompt"
+	}
+]

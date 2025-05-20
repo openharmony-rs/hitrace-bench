@@ -4,12 +4,13 @@ use clap::Parser;
 use filter::Filter;
 use rust_decimal::Decimal;
 use serde::Serialize;
-use std::{collections::HashMap, fs::File, io::BufWriter};
+use std::collections::HashMap;
 use time::Duration;
 use trace::Trace;
 use yansi::{Condition, Paint};
 
 mod args;
+mod bencher;
 mod device;
 mod filter;
 mod trace;
@@ -48,7 +49,7 @@ fn print_differences(args: &Args, results: RunResults, errors: HashMap<&str, u32
         "min".green(),
         "max".red(),
         args.tries,
-        args.homepage
+        args.url
     );
     for (key, val) in results.iter() {
         if let Some(avg_min_max) = avg_min_max(val) {
@@ -92,58 +93,24 @@ struct Latency {
     upper_value: Decimal,
 }
 
-/// Converts duration to bencher Decimal representation
-fn difference_to_bencher_decimal(dur: &Duration) -> Decimal {
-    let number = dur.whole_nanoseconds() as i64;
-    Decimal::new(number, 3)
-}
-
-/// Output in bencher json format to bench.json
-fn write_bencher(result: RunResults) {
-    let b: HashMap<&str, HashMap<&str, Latency>> = result
-        .into_iter()
-        .map(|(key, dur_vec)| {
-            let avg_min_max = avg_min_max(&dur_vec);
-            // yes we need this hashmap for the correct json
-            let mut map = HashMap::new();
-            if let Some(avg_min_max) = avg_min_max {
-                map.insert(
-                    "latency",
-                    Latency {
-                        value: difference_to_bencher_decimal(&avg_min_max.avg),
-                        lower_value: difference_to_bencher_decimal(&avg_min_max.min),
-                        upper_value: difference_to_bencher_decimal(&avg_min_max.max),
-                    },
-                );
-            }
-            (key, map)
-        })
-        .collect();
-    let file = File::create("bench.json").expect("Could not create file");
-    let writer = BufWriter::new(file);
-    print!("{:?}", b);
-    serde_json::to_writer_pretty(writer, &b).expect("Could not write json");
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&b).expect("Could not serialize")
-    );
-}
-
 fn main() -> Result<()> {
-    let filters = vec![
-        Filter {
-            name: "Surface->LoadStart",
-            first: |t| t.function.contains("on_surface_created_cb"),
-            last: |t| t.function.contains("load status changed Head"),
-        },
-        Filter {
-            name: "Load->Compl",
-            first: |t| t.function.contains("load status changed Head"),
-            last: |t| t.function.contains("PageLoadEndedPrompt"),
-        },
-    ];
-
     let args = Args::parse();
+    let filters = if let Some(ref path) = args.filter_file {
+        filter::read_filter_file(path)?
+    } else {
+        vec![
+            Filter {
+                name: String::from("Surface->LoadStart"),
+                first: Box::new(|t: &Trace| t.function.contains("on_surface_created_cb")),
+                last: Box::new(|t: &Trace| t.function.contains("load status changed Head")),
+            },
+            Filter {
+                name: String::from("Load->Compl"),
+                first: Box::new(|t: &Trace| t.function.contains("load status changed Head")),
+                last: Box::new(|t: &Trace| t.function.contains("PageLoadEndedPrompt")),
+            },
+        ]
+    };
 
     if !device::is_device_reachable().context("Testing reachability of device")? {
         return Err(anyhow!("No phone seems to be reachable"));
@@ -160,7 +127,7 @@ fn main() -> Result<()> {
             println!("Running test {}", i);
         }
         let log_path = device::exec_hdc_commands(&args)?;
-        let traces = device::read_file(&args, &log_path)?;
+        let traces = device::read_file(&log_path)?;
         let differences = filter::find_notable_differences(&traces, &filters);
         for (key, value) in differences.iter() {
             if let Ok(d) = value {
@@ -185,7 +152,7 @@ fn main() -> Result<()> {
     if args.computer_output {
         print_computer(results);
     } else if args.bencher {
-        write_bencher(results);
+        bencher::write_results(&args, results);
     } else {
         print_differences(&args, results, errors);
     }
