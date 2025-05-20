@@ -43,7 +43,6 @@ pub(crate) fn write_results(args: &Args, result: RunResults) {
         .open("bench.json")
         .expect("Could not open file");
     let writer = BufWriter::new(file);
-    print!("{:?}", b);
     serde_json::to_writer_pretty(writer, &b).expect("Could not write json");
     println!(
         "{}",

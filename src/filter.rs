@@ -55,7 +55,7 @@ pub(crate) fn find_notable_differences<'a>(
 
 #[derive(Deserialize)]
 /// The json type to filter
-struct JsonFilterDescription {
+pub(crate) struct JsonFilterDescription {
     /// The name the filter should have
     name: String,
     /// We will match the start of the filter to contain this function name

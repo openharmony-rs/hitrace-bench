@@ -9,7 +9,7 @@ use std::{
 };
 
 use crate::{
-    Args, Trace,
+    Trace,
     trace::{TimeStamp, TraceMarker},
 };
 
@@ -42,7 +42,7 @@ pub(crate) fn stop_tracing(buffer: u64) -> Result<()> {
 
 /// Execute the hdc commands on the device.
 pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
-    if !args.computer_output && !args.bencher {
+    if !args.bencher {
         println!("Executing hdc commands");
     }
     let hdc = which::which("hdc").context("Is hdc in the path?")?;
@@ -88,7 +88,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
     }
     Command::new(&hdc).args(cmd_args).output()?;
 
-    if !args.computer_output && !args.bencher {
+    if !args.bencher {
         println!("Sleeping for {}", args.sleep);
     }
     std::thread::sleep(std::time::Duration::from_secs(args.sleep));
@@ -118,7 +118,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
     stop_tracing(args.trace_buffer)?;
     let mut tmp_path = std::env::temp_dir();
     tmp_path.push("app.ftrace");
-    if !args.computer_output && !args.bencher {
+    if !args.bencher {
         println!("Writing ftrace to {}", tmp_path.to_str().unwrap());
     }
     // Receive trace
