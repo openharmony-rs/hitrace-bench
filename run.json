@@ -1,0 +1,30 @@
+[
+	{
+		"args": {
+			"bencher": true,
+			"url": "https://www.google.com",
+			"tries": 5
+		},
+		"filters": [
+			{
+				"name": "Load",
+				"start_fn_partial": "on_surface_created_cb",
+				"end_fn_partial": "PageLoadEndedPrompt"
+			}
+		]
+	},
+	{
+		"args": {
+			"bencher": true,
+			"url": "https://www.servo.org",
+			"tries": 5
+		},
+		"filters": [
+			{
+				"name": "Load",
+				"start_fn_partial": "on_surface_created_cb",
+				"end_fn_partial": "PageLoadEndedPrompt"
+			}
+		]
+	}
+]

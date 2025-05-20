@@ -58,6 +58,7 @@ pub(crate) struct Trace {
     #[allow(unused)]
     pub(crate) number: String,
     /// Some shorthand code
+    #[allow(unused)]
     pub(crate) shorthand: String,
     /// Full function name
     pub(crate) function: String,
