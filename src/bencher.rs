@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs::OpenOptions, io::BufWriter};
+use std::{collections::HashMap, fs::File, io::BufWriter};
 
 use rust_decimal::Decimal;
 use time::Duration;
@@ -35,11 +35,7 @@ pub(crate) fn write_results(result: RunResults) {
         })
         .collect();
 
-    let file = OpenOptions::new()
-        .create(true)
-        .truncate(true)
-        .open("bench.json")
-        .expect("Could not open file");
+    let file = File::create("bench.json").expect("Could not open file");
     let writer = BufWriter::new(file);
     serde_json::to_writer_pretty(writer, &b).expect("Could not write json");
     println!(
