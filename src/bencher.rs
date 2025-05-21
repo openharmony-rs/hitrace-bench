@@ -5,10 +5,10 @@ use time::Duration;
 
 use crate::{Latency, RunResults, avg_min_max};
 
-/// Converts duration to bencher Decimal representation
+/// Converts duration to bencher Decimal representation. Duration has precision of nanoseconds
 fn difference_to_bencher_decimal(dur: &Duration) -> Decimal {
-    let number = dur.whole_nanoseconds() as i64;
-    Decimal::new(number, 3)
+    let number = dur.whole_nanoseconds();
+    Decimal::from_i128_with_scale(number, 0)
 }
 
 /// Output in bencher json format to bench.json
