@@ -32,7 +32,7 @@ pub(crate) fn read_run_file(path: &PathBuf) -> Result<Vec<RunConfig>> {
     let file = File::open(path)
         .with_context(|| format!("Could not read run file {}", path.to_string_lossy()))?;
     let reader = BufReader::new(file);
-    let res: Vec<RunConfigDeserialize> = serde_json::from_reader(reader)
+    let res: Vec<RunConfigDeserialize> = serde_hjson::from_reader(reader)
         .context("Error in decoding run file. Please look at the specification")?;
 
     Ok(res
