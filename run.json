@@ -6,7 +6,7 @@
         "args": {
             "bencher": true, // output in bencher format
             "url": "https://www.google.com", // the url to test
-            "tries": 5 // How many repeated tries we should have, we show the min,max,avg in the output
+            "tries": 1 // How many repeated tries we should have, we show the min,max,avg in the output
             //"trace_buffer": 524288,   // trace_buffer size of hitrace
             //"sleep": 10,  // how long should we wait for servo to load the page
             //"bundle_name": "org.servo.servo", // the bundle name to start
@@ -25,19 +25,63 @@
                 "start_fn_partial": "on_surface_created_cb",
                 "end_fn_partial": "PageLoadEndedPrompt"
             }
+        ],
+        "point_filters": [
+            {
+                "name": "Explicit",
+                "match_str": "explicit"
+            },
+            {
+                "name": "Resident",
+                "match_str": "resident"
+            },
+            {
+                "name": "LayoutThread",
+                "match_str": "layout-thread"
+            },
+            {
+                "name": "image-cache",
+                "match_str": "image-cache"
+            },
+            {
+                "name": "JS",
+                "match_str": "js"
+            }
         ]
     },
     {
         "args": {
             "bencher": true,
             "url": "https://www.servo.org",
-            "tries": 5
+            "tries": 1
         },
         "filters": [
             {
                 "name": "Load",
                 "start_fn_partial": "on_surface_created_cb",
                 "end_fn_partial": "PageLoadEndedPrompt"
+            }
+        ],
+        "point_filters": [
+            {
+                "name": "Explicit",
+                "match_str": "explicit"
+            },
+            {
+                "name": "Resident",
+                "match_str": "resident"
+            },
+            {
+                "name": "LayoutThread",
+                "match_str": "layout-thread"
+            },
+            {
+                "name": "image-cache",
+                "match_str": "image-cache"
+            },
+            {
+                "name": "JS",
+                "match_str": "js"
             }
         ]
     }

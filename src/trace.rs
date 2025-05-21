@@ -15,7 +15,7 @@ impl Display for TimeStamp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub(crate) enum TraceMarker {
     StartSync,
     EndSync,
@@ -70,4 +70,13 @@ pub(crate) fn difference_of_traces(trace1: &Trace, trace2: &Trace) -> Duration {
         trace1.timestamp.seconds as i64 - trace2.timestamp.seconds as i64,
         (trace1.timestamp.micro as i32 - trace2.timestamp.micro as i32) * 1000,
     )
+}
+
+#[derive(Debug)]
+/// A parsed trace point metric
+pub(crate) struct Point {
+    /// The name you gave to this point
+    pub(crate) name: String,
+    /// The value of the point
+    pub(crate) value: u64,
 }
