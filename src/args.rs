@@ -53,6 +53,11 @@ pub(crate) struct Args {
     #[serde(skip)]
     pub(crate) run_file: Option<PathBuf>,
 
+    /// Read traces from a file
+    #[arg(long)]
+    #[serde(skip)]
+    pub(crate) trace_file: Option<PathBuf>,
+
     /// These will be directly given to the hdc shell start command at the end.
     #[arg(long, trailing_var_arg(true), allow_hyphen_values(true), num_args=0..)]
     #[serde(default = "default_commands")]

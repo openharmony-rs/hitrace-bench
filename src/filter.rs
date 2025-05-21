@@ -3,7 +3,13 @@ use serde::Deserialize;
 use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
 use time::Duration;
 
-use crate::{Trace, trace::difference_of_traces};
+use crate::{
+    RunConfig, Trace,
+    runconfig::JsonFilterDescription,
+    trace::{Point, TraceMarker, difference_of_traces},
+};
+
+const SERVO_MEMORY_PROFILING_STRING: &str = "servo_memory_profiling";
 
 /// Way to construct filters
 pub(crate) struct Filter {
@@ -42,6 +48,70 @@ impl Filter {
     }
 }
 
+/// You might want to extract data points. These do not have a beginning and end, just a point.
+#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct PointFilter {
+    /// The name we will use for this string
+    pub(crate) name: String,
+    /// We substring match on this
+    pub(crate) match_str: String,
+}
+
+impl PointFilter {
+    /// this is the main filter function
+    fn filter_trace_to_option_point(&self, trace: &Trace, run_config: &RunConfig) -> Option<Point> {
+        let value_string = trace
+            .function
+            .split_whitespace()
+            .last()
+            .with_context(|| format!("Error in parsing trace {:?}", trace))
+            .expect("Could not parse trace for last value");
+
+        let value = value_string
+            .parse()
+            .with_context(|| format!("Error in parsing trace {:?}", trace))
+            .expect("Could not parse number");
+
+        if let Some(after_url) = trace.function.find(')') {
+            // the url string will look like `servo_memory_profiling:(url)/` and we do not want the first /.
+            // Additionally, different iframes will have different matches, so we do not want iframes that
+            // are not part of the main url, so we return None and filter it.
+            let (before_url_str, after_url_str) = trace.function.split_at(after_url + 2);
+            if !before_url_str.contains(run_config.args.url.as_str()) {
+                None
+            } else {
+                let name = self.name.clone()
+                    + after_url_str
+                        .split_whitespace()
+                        .next()
+                        .unwrap()
+                        .strip_prefix(&self.match_str)
+                        .unwrap();
+                Some(Point { name, value })
+            }
+        } else {
+            Some(Point {
+                name: self.name.clone(),
+                value,
+            })
+        }
+    }
+
+    pub(crate) fn pointfilter_to_point(
+        &self,
+        traces: &[Trace],
+        run_config: &RunConfig,
+    ) -> Vec<Point> {
+        traces
+            .iter()
+            .filter(|t| t.trace_marker == TraceMarker::Dot)
+            .filter(|t| t.function.contains(SERVO_MEMORY_PROFILING_STRING))
+            .filter(|t| t.function.contains(&self.match_str))
+            .filter_map(|t| self.filter_trace_to_option_point(t, run_config))
+            .collect()
+    }
+}
+
 /// Look through the traces and find all timing differences coming from the filters
 pub(crate) fn find_notable_differences<'a>(
     v: &[Trace],
@@ -51,27 +121,6 @@ pub(crate) fn find_notable_differences<'a>(
         .iter()
         .map(|filter| filter.filter_to_duration(v))
         .collect()
-}
-
-#[derive(Deserialize)]
-/// The json type to filter
-pub(crate) struct JsonFilterDescription {
-    /// The name the filter should have
-    name: String,
-    /// We will match the start of the filter to contain this function name
-    start_fn_partial: String,
-    /// We will match the end of the filter to contain this function name
-    end_fn_partial: String,
-}
-
-impl From<JsonFilterDescription> for Filter {
-    fn from(value: JsonFilterDescription) -> Self {
-        Filter {
-            name: value.name,
-            first: Box::new(move |trace: &Trace| trace.function.contains(&value.start_fn_partial)),
-            last: Box::new(move |trace: &Trace| trace.function.contains(&value.end_fn_partial)),
-        }
-    }
 }
 
 pub(crate) fn read_filter_file(path: &PathBuf) -> Result<Vec<Filter>> {
