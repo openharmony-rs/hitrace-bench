@@ -51,10 +51,15 @@ pub(crate) fn write_results(result: RunResults) {
     });
 
     let points_iter = result.point_results.into_iter().map(|(key, points)| {
+        let name = if points.no_unit_conversion {
+            "Data"
+        } else {
+            "Memory"
+        };
         let mut map = HashMap::new();
-        let avg_min_max = avg_min_max::<u64, u64>(&points);
+        let avg_min_max = avg_min_max::<u64, u64>(&points.result);
         map.insert(
-            "Memory",
+            name,
             Latency {
                 value: Decimal::from_i128_with_scale(avg_min_max.avg as i128, 0),
                 lower_value: Decimal::from_i128_with_scale(avg_min_max.min as i128, 0),

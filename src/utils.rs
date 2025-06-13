@@ -30,7 +30,12 @@ where
 
 pub(crate) type FilterResults = HashMap<String, Vec<Duration>>;
 pub(crate) type FilterErrors = HashMap<String, u32>;
-pub(crate) type PointResults = HashMap<String, Vec<u64>>;
+pub(crate) type PointResults = HashMap<String, PointResult>;
+
+pub(crate) struct PointResult {
+    pub(crate) no_unit_conversion: bool,
+    pub(crate) result: Vec<u64>,
+}
 
 /// The results of a run given by filter.name, Vec<duration>
 /// Notice that not all vectors will have the same length as some runs might fail.

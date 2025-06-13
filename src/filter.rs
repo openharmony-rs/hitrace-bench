@@ -55,9 +55,20 @@ pub(crate) struct PointFilter {
     pub(crate) name: String,
     /// We substring match on this
     pub(crate) match_str: String,
+    /// Should we not assume this is in kb?
+    #[serde(default)]
+    pub(crate) no_unit_conversion: bool,
 }
 
 impl PointFilter {
+    pub(crate) fn new(name: String, match_str: String) -> Self {
+        PointFilter {
+            name,
+            match_str,
+            no_unit_conversion: false,
+        }
+    }
+
     /// this is the main filter function
     fn filter_trace_to_option_point(&self, trace: &Trace, run_config: &RunConfig) -> Option<Point> {
         let value_string = trace
@@ -87,12 +98,17 @@ impl PointFilter {
                         .unwrap()
                         .strip_prefix(&self.match_str)
                         .unwrap();
-                Some(Point { name, value })
+                Some(Point {
+                    name,
+                    value,
+                    no_unit_conversion: self.no_unit_conversion,
+                })
             }
         } else {
             Some(Point {
                 name: self.name.clone(),
                 value,
+                no_unit_conversion: self.no_unit_conversion,
             })
         }
     }
@@ -105,7 +121,10 @@ impl PointFilter {
         traces
             .iter()
             .filter(|t| t.trace_marker == TraceMarker::Dot)
-            .filter(|t| t.function.contains(SERVO_MEMORY_PROFILING_STRING))
+            .filter(|t| {
+                t.function.contains(SERVO_MEMORY_PROFILING_STRING)
+                    || t.function.contains("TESTCASE_PROFILING")
+            })
             .filter(|t| t.function.contains(&self.match_str))
             .filter_map(|t| self.filter_trace_to_option_point(t, run_config))
             .collect()
