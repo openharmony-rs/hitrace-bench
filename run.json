@@ -84,5 +84,21 @@
                 "match_str": "js"
             }
         ]
+    },
+    {
+        "args": {
+            "bencher": true,
+            "url": "file:///test.html",
+            "tries": 5
+        },
+        "filters": [
+        ],
+        "point_filters": [
+            {
+                "name": "generate_html",
+                "match_str": "generatehtml",
+                "no_unit_conversion": true
+            }
+        ]
     }
 ]

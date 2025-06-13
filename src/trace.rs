@@ -79,4 +79,6 @@ pub(crate) struct Point {
     pub(crate) name: String,
     /// The value of the point
     pub(crate) value: u64,
+    /// Do not convert units
+    pub(crate) no_unit_conversion: bool,
 }

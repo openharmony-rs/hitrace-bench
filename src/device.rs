@@ -40,6 +40,26 @@ pub(crate) fn stop_tracing(buffer: u64) -> Result<()> {
         .map_err(|_| anyhow!("Could not stop trace"))
 }
 
+#[derive(Debug)]
+struct DeviceFilePaths {
+    /// The file path to the file on disk
+    stem: String,
+    /// The file path we can access in the app
+    in_app: String,
+    /// The file path we can put files to
+    on_device: String,
+}
+
+fn device_file_paths(file_name: &str) -> DeviceFilePaths {
+    let real_file_name = file_name.trim_start_matches("file:///");
+
+    DeviceFilePaths {
+        stem: real_file_name.to_owned(),
+        in_app: format!("file:///system/fonts/{}", real_file_name),
+        on_device: format!("/system/fonts/{}", real_file_name),
+    }
+}
+
 /// Execute the hdc commands on the device.
 pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
     if !args.bencher {
@@ -50,6 +70,23 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
     Command::new(&hdc)
         .args(["shell", "aa", "force-stop", &args.bundle_name])
         .output()?;
+
+    let url = if args.url.contains("file:///") {
+        let device_file_path = device_file_paths(&args.url);
+        println!("{:?}", device_file_path);
+        Command::new(&hdc)
+            .args([
+                "file",
+                "send",
+                &device_file_path.stem,
+                &device_file_path.on_device,
+            ])
+            .output()?;
+        device_file_path.in_app
+    } else {
+        args.url.clone()
+    };
+
     // start trace
     Command::new(&hdc)
         .args([
@@ -66,6 +103,15 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
             "--trace_begin",
         ])
         .output()?;
+
+    /*
+        let mut logger = Command::new(&hdc)
+        .args(["shell", "hilog", "-D", "0xE0C3"])
+        .stdout(Stdio::piped())
+        .spawn()
+        .context("Could not spawn log catcher")?;
+    */
+
     // start the ability
     let mut cmd_args = vec![
         "shell",
@@ -76,7 +122,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         "-b",
         &args.bundle_name,
         "-U",
-        &args.url,
+        &url,
         "--ps=--pref",
         "js_disable_jit=true",
         "--ps=--tracing-filter",
@@ -116,6 +162,13 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         ));
     }
     stop_tracing(args.trace_buffer)?;
+
+    // getting the logs
+    //let mut logs = String::new();
+    //logger.kill()?;
+    //logger.stdout.unwrap().read_to_string(&mut logs)?;
+    //println!("{}", logs);
+
     let mut tmp_path = std::env::temp_dir();
     tmp_path.push("app.ftrace");
     if !args.bencher {

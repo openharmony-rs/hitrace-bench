@@ -10,6 +10,8 @@ use trace::{Point, Trace};
 use utils::{FilterErrors, FilterResults, PointResults, RunResults, avg_min_max};
 use yansi::{Condition, Paint};
 
+use crate::utils::PointResult;
+
 mod args;
 mod bencher;
 mod device;
@@ -50,21 +52,32 @@ fn print_differences(args: &Args, results: RunResults) {
         let mut sorted_points: Vec<_> = results.point_results.into_iter().collect();
         sorted_points.sort_by(|x, y| x.0.cmp(&y.0));
         for (key, val) in sorted_points {
-            let avg_min_max = avg_min_max::<u64, u64>(&val);
-            println!(
-                "{}: {} {} {}  ({} runs)",
-                key,
-                humanize_bytes_binary!(avg_min_max.avg)
-                    .yellow()
-                    .whenever(Condition::TTY_AND_COLOR),
-                humanize_bytes_binary!(avg_min_max.min)
-                    .green()
-                    .whenever(Condition::TTY_AND_COLOR),
-                humanize_bytes_binary!(avg_min_max.max)
-                    .red()
-                    .whenever(Condition::TTY_AND_COLOR),
-                avg_min_max.number,
-            );
+            let avg_min_max = avg_min_max::<u64, u64>(&val.result);
+            if val.no_unit_conversion {
+                println!(
+                    "{}: {} {} {} ({} runs)",
+                    key,
+                    avg_min_max.avg.yellow().whenever(Condition::TTY_AND_COLOR),
+                    avg_min_max.min.green().whenever(Condition::TTY_AND_COLOR),
+                    avg_min_max.max.red().whenever(Condition::TTY_AND_COLOR),
+                    avg_min_max.number
+                );
+            } else {
+                println!(
+                    "{}: {} {} {}  ({} runs)",
+                    key,
+                    humanize_bytes_binary!(avg_min_max.avg)
+                        .yellow()
+                        .whenever(Condition::TTY_AND_COLOR),
+                    humanize_bytes_binary!(avg_min_max.min)
+                        .green()
+                        .whenever(Condition::TTY_AND_COLOR),
+                    humanize_bytes_binary!(avg_min_max.max)
+                        .red()
+                        .whenever(Condition::TTY_AND_COLOR),
+                    avg_min_max.number,
+                );
+            }
         }
     }
 }
@@ -110,8 +123,11 @@ fn run_runconfig_points(run_config: &RunConfig, traces: &[Trace], points: &mut P
         };
         points
             .entry(key)
-            .and_modify(|v| v.push(p.value))
-            .or_insert(vec![p.value]);
+            .and_modify(|v| v.result.push(p.value))
+            .or_insert(PointResult {
+                no_unit_conversion: p.no_unit_conversion,
+                result: vec![p.value],
+            });
     }
 }
 
@@ -216,23 +232,12 @@ fn main() -> Result<()> {
                 PointFilter {
                     name: String::from("Explicit"),
                     match_str: String::from("explicit"),
+                    no_unit_conversion: false,
                 },
-                PointFilter {
-                    name: String::from("Resident"),
-                    match_str: String::from("resident"),
-                },
-                PointFilter {
-                    name: String::from("LayoutThread"),
-                    match_str: String::from("layout-thread"),
-                },
-                PointFilter {
-                    name: String::from("image-cache"),
-                    match_str: String::from("image-cache"),
-                },
-                PointFilter {
-                    name: String::from("JS"),
-                    match_str: String::from("js"),
-                },
+                PointFilter::new(String::from("Resident"), String::from("resident")),
+                PointFilter::new(String::from("LayoutThread"), String::from("layout-thread")),
+                PointFilter::new(String::from("image-cache"), String::from("image-cache")),
+                PointFilter::new(String::from("JS"), String::from("js")),
             ];
             vec![RunConfig::new(args, filters, point_filters)]
         }
