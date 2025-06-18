@@ -73,7 +73,9 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
 
     let url = if args.url.contains("file:///") {
         let device_file_path = device_file_paths(&args.url);
-        println!("{:?}", device_file_path);
+        if !args.bencher {
+            println!("{:?}", device_file_path);
+        }
         Command::new(&hdc)
             .args([
                 "file",

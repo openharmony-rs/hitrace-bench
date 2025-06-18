@@ -1,0 +1,21 @@
+// This json file allows comments and is technically a hjson file.
+// Different {} correspond to completely different runs which can have
+// different filters and different arguments
+[
+    {
+        "args": {
+            "bencher": true,
+            "url": "file:///generate_html.html",
+            "tries": 2
+        },
+        "filters": [
+        ],
+        "point_filters": [
+            {
+                "name": "generate_html",
+                "match_str": "generatehtml",
+                "no_unit_conversion": true
+            }
+        ]
+    }
+]
