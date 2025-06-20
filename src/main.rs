@@ -115,6 +115,7 @@ fn run_runconfig_points(run_config: &RunConfig, traces: &[Trace], points: &mut P
         .iter()
         .flat_map(|f| f.pointfilter_to_point(traces, run_config))
         .collect();
+
     for p in new_points {
         let key = if run_config.args.bencher {
             format!("E2E/{}/{}", run_config.args.url, p.name)
@@ -233,11 +234,18 @@ fn main() -> Result<()> {
                     name: String::from("Explicit"),
                     match_str: String::from("explicit"),
                     no_unit_conversion: false,
+                    combined: false,
                 },
                 PointFilter::new(String::from("Resident"), String::from("resident")),
                 PointFilter::new(String::from("LayoutThread"), String::from("layout-thread")),
                 PointFilter::new(String::from("image-cache"), String::from("image-cache")),
                 PointFilter::new(String::from("JS"), String::from("js")),
+                PointFilter {
+                    name: String::from("resident-smaps"),
+                    match_str: String::from("resident-according-to-smaps"),
+                    no_unit_conversion: false,
+                    combined: true,
+                },
             ];
             vec![RunConfig::new(args, filters, point_filters)]
         }
