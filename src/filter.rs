@@ -1,6 +1,8 @@
 use anyhow::{Context, Result, anyhow};
+use itertools::Itertools;
+use regex::{Captures, Regex};
 use serde::Deserialize;
-use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
+use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf, sync::LazyLock};
 use time::Duration;
 
 use crate::{
@@ -58,7 +60,31 @@ pub(crate) struct PointFilter {
     /// Should we not assume this is in kb?
     #[serde(default)]
     pub(crate) no_unit_conversion: bool,
+    /// With this we combine all points that match a substring
+    #[serde(default)]
+    pub(crate) combined: bool,
 }
+
+/// Notice that this also matches MEMORY_URL_REPORT
+/// This is the general regexp
+/// Example: servo_memory_profiling:resident 270778368
+static MEMORY_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^servo_memory_profiling:(.*?)\s(\d+)$").expect("Could not parse regexp")
+});
+
+/// Reports that contain an url/iframe
+/// Example: servo_memory_profiling:url(https://servo.org/)/js/non-heap 262144
+static MEMORY_URL_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^servo_memory_profiling:url\((.*?)\)\/(.*?)\s(\d+)$")
+        .expect("Could not parse regexp")
+});
+
+/// resident-according-to-smaps has again a different way
+/// Example: servo_memory_profiling:resident-according-to-smaps/other 60424192
+static SMAPS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\s(\d+)$")
+        .expect("Could not parse regexp")
+});
 
 impl PointFilter {
     pub(crate) fn new(name: String, match_str: String) -> Self {
@@ -66,45 +92,44 @@ impl PointFilter {
             name,
             match_str,
             no_unit_conversion: false,
+            combined: false,
         }
     }
 
-    /// this is the main filter function
-    fn filter_trace_to_option_point(&self, trace: &Trace, run_config: &RunConfig) -> Option<Point> {
-        let value_string = trace
-            .function
-            .split_whitespace()
-            .last()
-            .with_context(|| format!("Error in parsing trace {:?}", trace))
-            .expect("Could not parse trace for last value");
-
-        let value = value_string
+    fn filter_memory_url(&self, run_config: &RunConfig, groups: Captures) -> Option<Point> {
+        let url = groups.get(1).expect("No match").as_str();
+        let fn_name = groups.get(2).expect("No match").as_str();
+        let value = groups
+            .get(3)
+            .expect("No match")
+            .as_str()
             .parse()
-            .with_context(|| format!("Error in parsing trace {:?}", trace))
-            .expect("Could not parse number");
-
-        if let Some(after_url) = trace.function.find(')') {
-            // the url string will look like `servo_memory_profiling:(url)/` and we do not want the first /.
-            // Additionally, different iframes will have different matches, so we do not want iframes that
-            // are not part of the main url, so we return None and filter it.
-            let (before_url_str, after_url_str) = trace.function.split_at(after_url + 2);
-            if !before_url_str.contains(run_config.args.url.as_str()) {
-                None
-            } else {
-                let name = self.name.clone()
-                    + after_url_str
-                        .split_whitespace()
-                        .next()
-                        .unwrap()
-                        .strip_prefix(&self.match_str)
-                        .unwrap();
-                Some(Point {
-                    name,
-                    value,
-                    no_unit_conversion: self.no_unit_conversion,
-                })
+            .expect("Could not parse value");
+        if url.contains(run_config.args.url.as_str()) {
+            let mut suffix = fn_name.split('/').skip(1).join("/");
+            if !suffix.is_empty() {
+                suffix.insert(0, '/');
             }
+            Some(Point {
+                name: self.name.clone() + suffix.as_str(),
+                value,
+                no_unit_conversion: self.no_unit_conversion,
+            })
         } else {
+            None
+        }
+    }
+
+    fn filter_smaps(&self, groups: Captures) -> Option<Point> {
+        if groups.get(1).unwrap().as_str() != self.match_str {
+            None
+        } else {
+            let value = groups
+                .get(3)
+                .unwrap()
+                .as_str()
+                .parse()
+                .expect("Could not parse");
             Some(Point {
                 name: self.name.clone(),
                 value,
@@ -113,12 +138,46 @@ impl PointFilter {
         }
     }
 
+    fn filter_memory(&self, groups: Captures) -> Option<Point> {
+        // this regex also matches the above characters
+        //t fn_name = groups.get(1).expect("No match").as_str();
+        let value = groups
+            .get(2)
+            .expect("Could not find match")
+            .as_str()
+            .parse()
+            .expect("Could not parse value");
+        //if fn_name != self.match_str {
+        //            None
+        //        } else {
+        Some(Point {
+            name: self.name.clone(),
+            value,
+            no_unit_conversion: self.no_unit_conversion,
+        })
+        //      }
+    }
+
+    /// this is the main filter function
+    fn filter_trace_to_option_point(&self, trace: &Trace, run_config: &RunConfig) -> Option<Point> {
+        if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
+            self.filter_memory_url(run_config, groups)
+        } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
+            println!("trace matches smaps {:?} {:?}", &trace.function, self.name);
+            self.filter_smaps(groups)
+        } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
+            self.filter_memory(groups)
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn pointfilter_to_point(
         &self,
         traces: &[Trace],
         run_config: &RunConfig,
     ) -> Vec<Point> {
-        traces
+        let points: Vec<_> = traces
             .iter()
             .filter(|t| t.trace_marker == TraceMarker::Dot)
             .filter(|t| {
@@ -127,7 +186,31 @@ impl PointFilter {
             })
             .filter(|t| t.function.contains(&self.match_str))
             .filter_map(|t| self.filter_trace_to_option_point(t, run_config))
-            .collect()
+            .collect();
+
+        if self.combined {
+            // we now need to collect points with the same name
+            //println!("points {:?}\n\n", points);
+            points
+                .into_iter()
+                .into_group_map_by(|p| p.name.clone())
+                .into_iter()
+                .map(|(name, mut vals)| {
+                    if vals.len() == 1 {
+                        vals.remove(0)
+                    } else {
+                        Point {
+                            name,
+                            value: vals.iter().map(|p| p.value).sum(),
+                            no_unit_conversion: vals.first().unwrap().no_unit_conversion,
+                        }
+                    }
+                })
+                .collect()
+        } else {
+            println!("popints {:?}\n\n", points);
+            points
+        }
     }
 }
 

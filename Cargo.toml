@@ -11,6 +11,7 @@ anyhow = "1.0.98"
 clap = { version = "4.5.40", features = ["derive"] }
 ctrlc = "3.4.7"
 humanize-bytes = "1.0.6"
+itertools = "0.14.0"
 json5 = "0.4.1"
 regex = "1.11.1"
 rust_decimal = { version = "1.37.2", features = ["serde-with-float"] }
