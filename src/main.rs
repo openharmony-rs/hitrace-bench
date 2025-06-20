@@ -139,7 +139,7 @@ fn run_runconfig(
     points: &mut PointResults,
 ) -> Result<()> {
     for i in 1..run_config.args.tries + 1 {
-        if !run_config.args.bencher {
+        if !run_config.args.bencher && !run_config.args.quiet {
             println!("Running test {}", i);
         }
         let traces = if let Some(ref file) = run_config.args.trace_file {
