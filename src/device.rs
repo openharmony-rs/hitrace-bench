@@ -62,7 +62,8 @@ fn device_file_paths(file_name: &str) -> DeviceFilePaths {
 
 /// Execute the hdc commands on the device.
 pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
-    if !args.bencher {
+    let be_loud = !args.bencher && !args.quiet;
+    if be_loud {
         println!("Executing hdc commands");
     }
     let hdc = which::which("hdc").context("Is hdc in the path?")?;
@@ -136,7 +137,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
     }
     Command::new(&hdc).args(cmd_args).output()?;
 
-    if !args.bencher {
+    if be_loud {
         println!("Sleeping for {}", args.sleep);
     }
     std::thread::sleep(std::time::Duration::from_secs(args.sleep));
@@ -173,7 +174,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
 
     let mut tmp_path = std::env::temp_dir();
     tmp_path.push("app.ftrace");
-    if !args.bencher {
+    if be_loud {
         println!("Writing ftrace to {}", tmp_path.to_str().unwrap());
     }
     // Receive trace
