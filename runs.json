@@ -6,11 +6,12 @@
         "args": {
             "bencher": true, // output in bencher format
             "url": "https://www.google.com", // the url to test
-            "tries": 5 // How many repeated tries we should have, we show the min,max,avg in the output
+            "tries": 5, // How many repeated tries we should have, we show the min,max,avg in the output
             //"trace_buffer": 524288,   // trace_buffer size of hitrace
             //"sleep": 10,  // how long should we wait for servo to load the page
             //"bundle_name": "org.servo.servo", // the bundle name to start
             //"commands": ["--ps=--tracing-filter", "info"] // arbitrary additional arguments
+            "is_rooted": true  // Allows files to be pushed to the device instead of relying them being already packaged
         },
         "filters": [
             // Filters are currently given via the simple serialize of `filters::JsonValueFilter`.
@@ -91,7 +92,7 @@
             {
                 "name": "resident-smaps",
                 "match_str": "resident-according-to-smaps",
-                "combined": true,
+                "combined": true
             }
         ]
     },
@@ -107,7 +108,7 @@
             {
                 "name": "",
                 "match_str": "generatehtml",
-                "no_unit_conversion": true,
+                "no_unit_conversion": true
             }
         ]
     }

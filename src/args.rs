@@ -63,6 +63,11 @@ pub(crate) struct Args {
     #[serde(skip)]
     pub(crate) quiet: bool,
 
+    /// Allowed to move files to a directory on the phone.
+    #[arg(short, long)]
+    #[serde(default = "default_is_rooted")]
+    pub(crate) is_rooted: bool,
+
     /// These will be directly given to the hdc shell start command at the end.
     #[arg(long, trailing_var_arg(true), allow_hyphen_values(true), num_args=0..)]
     #[serde(default = "default_commands")]
@@ -100,4 +105,8 @@ fn default_bencher() -> bool {
 
 fn default_commands() -> Option<Vec<String>> {
     None
+}
+
+fn default_is_rooted() -> bool {
+    false
 }

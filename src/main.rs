@@ -3,6 +3,7 @@ use args::Args;
 use clap::Parser;
 use filter::{Filter, PointFilter};
 use humanize_bytes::humanize_bytes_binary;
+use log::{error, info};
 use runconfig::RunConfig;
 use std::collections::HashMap;
 use time::Duration;
@@ -22,13 +23,15 @@ mod utils;
 
 /// Print the differences
 fn print_differences(args: &Args, results: RunResults) {
-    println!("The following things broke with errors");
-    for (key, val) in results.errors.iter() {
-        println!("{key}: {val} errors");
+    if !results.errors.is_empty() {
+        println!("The following things broke with errors");
+        for (key, val) in results.errors.iter() {
+            println!("{key}: {val} errors");
+        }
     }
 
     println!(
-        "----name {} {} {}------({}) runs (hp:{})------------------------",
+        "\n----name {} {} {}------({}) runs (hp:{})------------------------",
         "avg".yellow(),
         "min".green(),
         "max".red(),
@@ -79,6 +82,7 @@ fn print_differences(args: &Args, results: RunResults) {
                 );
             }
         }
+        println!();
     }
 }
 
@@ -140,9 +144,7 @@ fn run_runconfig(
     points: &mut PointResults,
 ) -> Result<()> {
     for i in 1..run_config.args.tries + 1 {
-        if !run_config.args.bencher && !run_config.args.quiet {
-            println!("Running test {i}");
-        }
+        info!("Running test {i}");
         let traces = if let Some(ref file) = run_config.args.trace_file {
             device::read_file(file)?
         } else {
@@ -209,46 +211,52 @@ fn run_runconfigs(run_configs: &Vec<RunConfig>, use_bencher: bool) -> Result<()>
 }
 
 fn main() -> Result<()> {
-    let run_configs: Vec<RunConfig> = {
+    let (be_quiet, run_configs) = {
         let args = Args::parse();
-        if let Some(file) = args.run_file {
-            runconfig::read_run_file(&file)?
-        } else if let Some(ref path) = args.filter_file {
-            let filters = filter::read_filter_file(path)?;
-            vec![RunConfig::new(args, filters, vec![])]
-        } else {
-            let filters = vec![
-                Filter {
-                    name: String::from("Surface->LoadStart"),
-                    first: Box::new(|t: &Trace| t.function.contains("on_surface_created_cb")),
-                    last: Box::new(|t: &Trace| t.function.contains("load status changed Head")),
-                },
-                Filter {
-                    name: String::from("Load->Compl"),
-                    first: Box::new(|t: &Trace| t.function.contains("load status changed Head")),
-                    last: Box::new(|t: &Trace| t.function.contains("PageLoadEndedPrompt")),
-                },
-            ];
-            let point_filters = vec![
-                PointFilter {
-                    name: String::from("Explicit"),
-                    match_str: String::from("explicit"),
-                    no_unit_conversion: false,
-                    combined: false,
-                },
-                PointFilter::new(String::from("Resident"), String::from("resident")),
-                PointFilter::new(String::from("LayoutThread"), String::from("layout-thread")),
-                PointFilter::new(String::from("image-cache"), String::from("image-cache")),
-                PointFilter::new(String::from("JS"), String::from("js")),
-                PointFilter {
-                    name: String::from("resident-smaps"),
-                    match_str: String::from("resident-according-to-smaps"),
-                    no_unit_conversion: false,
-                    combined: true,
-                },
-            ];
-            vec![RunConfig::new(args, filters, point_filters)]
-        }
+        (
+            args.quiet,
+            if let Some(file) = args.run_file {
+                runconfig::read_run_file(&file)?
+            } else if let Some(ref path) = args.filter_file {
+                let filters = filter::read_filter_file(path)?;
+                vec![RunConfig::new(args, filters, vec![])]
+            } else {
+                let filters = vec![
+                    Filter {
+                        name: String::from("Surface->LoadStart"),
+                        first: Box::new(|t: &Trace| t.function.contains("on_surface_created_cb")),
+                        last: Box::new(|t: &Trace| t.function.contains("load status changed Head")),
+                    },
+                    Filter {
+                        name: String::from("Load->Compl"),
+                        first: Box::new(|t: &Trace| {
+                            t.function.contains("load status changed Head")
+                        }),
+                        last: Box::new(|t: &Trace| t.function.contains("PageLoadEndedPrompt")),
+                    },
+                ];
+                let point_filters = vec![
+                    PointFilter {
+                        name: String::from("Explicit"),
+                        match_str: String::from("explicit"),
+                        no_unit_conversion: false,
+                        combined: false,
+                    },
+                    PointFilter::new(String::from("Resident"), String::from("resident")),
+                    PointFilter::new(String::from("LayoutThread"), String::from("layout-thread")),
+                    PointFilter::new(String::from("image-cache"), String::from("image-cache")),
+                    PointFilter::new(String::from("JS"), String::from("js")),
+                    PointFilter {
+                        name: String::from("resident-smaps"),
+                        match_str: String::from("resident-according-to-smaps"),
+                        no_unit_conversion: false,
+                        combined: true,
+                    },
+                ];
+
+                vec![RunConfig::new(args, filters, point_filters)]
+            },
+        )
     };
 
     if !device::is_device_reachable().context("Testing reachability of device")? {
@@ -264,9 +272,16 @@ fn main() -> Result<()> {
     let all_bencher = run_configs.iter().all(|r| r.args.bencher);
     let all_print = run_configs.iter().all(|r| !r.args.bencher);
     if !all_bencher && !all_print {
-        println!("We only support all bencher or all print runs");
+        error!("We only support all bencher or all print runs");
         return Ok(());
     }
+    let be_loud_filter = if be_quiet || all_bencher {
+        log::LevelFilter::Error
+    } else {
+        log::LevelFilter::Info
+    };
+
+    env_logger::builder().filter_level(be_loud_filter).init();
 
     ctrlc::set_handler(move || {
         device::stop_tracing(trace_buffer).expect("Could not stop tracing");
