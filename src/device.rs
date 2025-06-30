@@ -1,5 +1,6 @@
 //! Functions to handle the device
 use anyhow::{Context, Result, anyhow};
+use log::{error, info};
 use regex::Regex;
 use std::{
     fs::File,
@@ -50,22 +51,29 @@ struct DeviceFilePaths {
     on_device: String,
 }
 
-fn device_file_paths(file_name: &str, bundle_name: &str) -> DeviceFilePaths {
+fn device_file_paths(file_name: &str, bundle_name: &str, is_rooted: bool) -> DeviceFilePaths {
     let real_file_name = file_name.trim_start_matches("file:///");
 
-    DeviceFilePaths {
-        stem: real_file_name.to_owned(),
-        in_app: format!("file:///data/storage/el2/base/cache/{real_file_name}"),
-        on_device: format!("/data/app/el2/100/base/{bundle_name}/cache/{real_file_name}"),
+    if is_rooted {
+        DeviceFilePaths {
+            stem: real_file_name.to_owned(),
+            in_app: format!("file:///data/storage/el2/base/cache/{real_file_name}"),
+            on_device: format!("/data/app/el2/100/base/{bundle_name}/cache/{real_file_name}"),
+        }
+    } else {
+        DeviceFilePaths {
+            stem: real_file_name.to_owned(),
+            in_app: format!(
+                "file:///data/storage/el1/bundle/servoshell/resources/resfile/{real_file_name}"
+            ),
+            on_device: String::new(),
+        }
     }
 }
 
 /// Execute the hdc commands on the device.
 pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
-    let be_loud = !args.bencher && !args.quiet;
-    if be_loud {
-        println!("Executing hdc commands");
-    }
+    info!("Executing hdc commands");
     let hdc = which::which("hdc").context("Is hdc in the path?")?;
     // stop the app before starting the test
     Command::new(&hdc)
@@ -73,18 +81,22 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         .output()?;
 
     let url = if args.url.contains("file:///") {
-        let device_file_path = device_file_paths(&args.url, &args.bundle_name);
-        if !args.bencher {
-            println!("{device_file_path:?}");
+        let device_file_path = device_file_paths(&args.url, &args.bundle_name, args.is_rooted);
+
+        if args.is_rooted {
+            info!(
+                "Uploading to {} visible as {}",
+                device_file_path.on_device, device_file_path.in_app
+            );
+            Command::new(&hdc)
+                .args([
+                    "file",
+                    "send",
+                    &device_file_path.stem,
+                    &device_file_path.on_device,
+                ])
+                .output()?;
         }
-        Command::new(&hdc)
-            .args([
-                "file",
-                "send",
-                &device_file_path.stem,
-                &device_file_path.on_device,
-            ])
-            .output()?;
         device_file_path.in_app
     } else {
         args.url.clone()
@@ -107,14 +119,6 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         ])
         .output()?;
 
-    /*
-        let mut logger = Command::new(&hdc)
-        .args(["shell", "hilog", "-D", "0xE0C3"])
-        .stdout(Stdio::piped())
-        .spawn()
-        .context("Could not spawn log catcher")?;
-    */
-
     // start the ability
     let mut cmd_args = vec![
         "shell",
@@ -136,10 +140,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         cmd_args.append(&mut v);
     }
     Command::new(&hdc).args(cmd_args).output()?;
-
-    if be_loud {
-        println!("Sleeping for {}", args.sleep);
-    }
+    info!("Sleeping for {}", args.sleep);
     std::thread::sleep(std::time::Duration::from_secs(args.sleep));
 
     // Getting app pid is a simple test if the app perhaps crashed during the benchmark / test.
@@ -166,17 +167,9 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
     }
     stop_tracing(args.trace_buffer)?;
 
-    // getting the logs
-    //let mut logs = String::new();
-    //logger.kill()?;
-    //logger.stdout.unwrap().read_to_string(&mut logs)?;
-    //println!("{}", logs);
-
     let mut tmp_path = std::env::temp_dir();
     tmp_path.push("app.ftrace");
-    if be_loud {
-        println!("Writing ftrace to {}", tmp_path.to_str().unwrap());
-    }
+    info!("Writing ftrace to {}", tmp_path.to_str().unwrap());
     // Receive trace
     Command::new(&hdc)
         .args([
@@ -251,7 +244,7 @@ pub(crate) fn read_file(f: &Path) -> Result<Vec<Trace>> {
         .partition(|(_index, l)| l.is_ok());
 
     if !invalid_lines.is_empty() {
-        println!(
+        error!(
             "Could not read lines {:?}",
             invalid_lines
                 .iter()
