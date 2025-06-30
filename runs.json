@@ -49,7 +49,8 @@
             },
             {
                 "name": "resident-smaps",
-                "match_str": "resident_according-to-smaps"
+                "match_str": "resident-according-to-smaps",
+                "combined": true,
             }
         ]
     },
@@ -89,7 +90,24 @@
             },
             {
                 "name": "resident-smaps",
-                "match_str": "resident_according-to-smaps"
+                "match_str": "resident-according-to-smaps",
+                "combined": true,
+            }
+        ]
+    },
+    {
+        "args": {
+            "bencher": true,
+            "url": "file:///generate_html.html",
+            "tries": 5
+        },
+        "filters": [
+        ],
+        "point_filters": [
+            {
+                "name": "",
+                "match_str": "generatehtml",
+                "no_unit_conversion": true,
             }
         ]
     }
