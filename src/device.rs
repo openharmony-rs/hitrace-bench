@@ -50,13 +50,13 @@ struct DeviceFilePaths {
     on_device: String,
 }
 
-fn device_file_paths(file_name: &str) -> DeviceFilePaths {
+fn device_file_paths(file_name: &str, bundle_name: &str) -> DeviceFilePaths {
     let real_file_name = file_name.trim_start_matches("file:///");
 
     DeviceFilePaths {
         stem: real_file_name.to_owned(),
-        in_app: format!("file:///system/fonts/{}", real_file_name),
-        on_device: format!("/system/fonts/{}", real_file_name),
+        in_app: format!("file:///data/storage/el2/base/cache/{real_file_name}"),
+        on_device: format!("/data/app/el2/100/base/{bundle_name}/cache/{real_file_name}"),
     }
 }
 
@@ -73,9 +73,9 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         .output()?;
 
     let url = if args.url.contains("file:///") {
-        let device_file_path = device_file_paths(&args.url);
+        let device_file_path = device_file_paths(&args.url, &args.bundle_name);
         if !args.bencher {
-            println!("{:?}", device_file_path);
+            println!("{device_file_path:?}");
         }
         Command::new(&hdc)
             .args([

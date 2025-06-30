@@ -24,7 +24,7 @@ mod utils;
 fn print_differences(args: &Args, results: RunResults) {
     println!("The following things broke with errors");
     for (key, val) in results.errors.iter() {
-        println!("{}: {} errors", key, val);
+        println!("{key}: {val} errors");
     }
 
     println!(
@@ -141,7 +141,7 @@ fn run_runconfig(
 ) -> Result<()> {
     for i in 1..run_config.args.tries + 1 {
         if !run_config.args.bencher && !run_config.args.quiet {
-            println!("Running test {}", i);
+            println!("Running test {i}");
         }
         let traces = if let Some(ref file) = run_config.args.trace_file {
             device::read_file(file)?
@@ -155,7 +155,7 @@ fn run_runconfig(
         if run_config.args.tries == 1 && run_config.args.all_traces {
             println!("Printing {} traces", &traces.len());
             for i in &traces {
-                println!("{:?}", i);
+                println!("{i:?}");
             }
             println!("----------------------------------------------------------\n\n");
         }

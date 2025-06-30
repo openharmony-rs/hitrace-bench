@@ -86,6 +86,10 @@ static SMAPS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         .expect("Could not parse regexp")
 });
 
+static TESTCASE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^TESTCASE_PROFILING: (.*?) (\d+)$").expect("Could not parse regexp")
+});
+
 impl PointFilter {
     pub(crate) fn new(name: String, match_str: String) -> Self {
         PointFilter {
@@ -158,15 +162,36 @@ impl PointFilter {
         //      }
     }
 
+    /// This filters test cases
+    fn filter_testcase(&self, groups: Captures) -> Option<Point> {
+        let case_name = groups.get(1).expect("Could not find match").as_str();
+        let value = groups
+            .get(2)
+            .expect("Could not find match")
+            .as_str()
+            .parse()
+            .expect("Could not parse value");
+        if case_name.contains(&self.match_str) {
+            Some(Point {
+                name: self.name.clone(),
+                value,
+                no_unit_conversion: self.no_unit_conversion,
+            })
+        } else {
+            None
+        }
+    }
+
     /// this is the main filter function
     fn filter_trace_to_option_point(&self, trace: &Trace, run_config: &RunConfig) -> Option<Point> {
         if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
             self.filter_memory_url(run_config, groups)
         } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
-            println!("trace matches smaps {:?} {:?}", &trace.function, self.name);
             self.filter_smaps(groups)
         } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
             self.filter_memory(groups)
+        } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
+            self.filter_testcase(groups)
         } else {
             None
         }
@@ -190,7 +215,6 @@ impl PointFilter {
 
         if self.combined {
             // we now need to collect points with the same name
-            //println!("points {:?}\n\n", points);
             points
                 .into_iter()
                 .into_group_map_by(|p| p.name.clone())
@@ -208,7 +232,6 @@ impl PointFilter {
                 })
                 .collect()
         } else {
-            println!("popints {:?}\n\n", points);
             points
         }
     }
