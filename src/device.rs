@@ -11,6 +11,7 @@ use std::{
 
 use crate::{
     Trace,
+    args::RunArgs,
     trace::{TimeStamp, TraceMarker},
 };
 
@@ -72,18 +73,18 @@ fn device_file_paths(file_name: &str, bundle_name: &str, is_rooted: bool) -> Dev
 }
 
 /// Execute the hdc commands on the device.
-pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
+pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<PathBuf> {
     info!("Executing hdc commands");
     let hdc = which::which("hdc").context("Is hdc in the path?")?;
     // stop the app before starting the test
     Command::new(&hdc)
-        .args(["shell", "aa", "force-stop", &args.bundle_name])
+        .args(["shell", "aa", "force-stop", &run_args.bundle_name])
         .output()?;
 
-    let url = if args.url.contains("file:///") {
-        let device_file_path = device_file_paths(&args.url, &args.bundle_name, args.is_rooted);
+    let url = if run_args.url.contains("file:///") {
+        let device_file_path = device_file_paths(&run_args.url, &run_args.bundle_name, is_rooted);
 
-        if args.is_rooted {
+        if is_rooted {
             info!(
                 "Uploading to {} visible as {}",
                 device_file_path.on_device, device_file_path.in_app
@@ -99,7 +100,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         }
         device_file_path.in_app
     } else {
-        args.url.clone()
+        run_args.url.clone()
     };
 
     // start trace
@@ -108,7 +109,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
             "shell",
             "hitrace",
             "-b",
-            &args.trace_buffer.to_string(),
+            &run_args.trace_buffer.to_string(),
             "app",
             "graphic",
             "ohos",
@@ -127,7 +128,7 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         "-a",
         "EntryAbility",
         "-b",
-        &args.bundle_name,
+        &run_args.bundle_name,
         "-U",
         &url,
         "--ps=--pref",
@@ -135,26 +136,26 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
         "--ps=--tracing-filter",
         "trace",
     ];
-    if let Some(ref v) = args.commands {
+    if let Some(ref v) = run_args.commands {
         let mut v = v.iter().map(|s| s.as_str()).collect();
         cmd_args.append(&mut v);
     }
     Command::new(&hdc).args(cmd_args).output()?;
-    info!("Sleeping for {}", args.sleep);
-    std::thread::sleep(std::time::Duration::from_secs(args.sleep));
+    info!("Sleeping for {}", run_args.sleep);
+    std::thread::sleep(std::time::Duration::from_secs(run_args.sleep));
 
     // Getting app pid is a simple test if the app perhaps crashed during the benchmark / test.
     let cmd = Command::new(&hdc)
-        .args(["shell", "pidof", &args.bundle_name])
+        .args(["shell", "pidof", &run_args.bundle_name])
         .output()
-        .with_context(|| format!("Is `{}` installed?", args.bundle_name))?;
+        .with_context(|| format!("Is `{}` installed?", run_args.bundle_name))?;
     if cmd.stdout.is_empty() {
         Command::new(&hdc)
             .args([
                 "shell",
                 "hitrace",
                 "-b",
-                &args.trace_buffer.to_string(),
+                &run_args.trace_buffer.to_string(),
                 "--trace_finish",
                 "-o",
                 "/data/local/tmp/ohtrace.txt",
@@ -162,10 +163,10 @@ pub(crate) fn exec_hdc_commands(args: &crate::Args) -> Result<PathBuf> {
             .output()?;
         return Err(anyhow!(
             "{} did not start or crashed. Please check the application logs.",
-            args.bundle_name
+            run_args.bundle_name
         ));
     }
-    stop_tracing(args.trace_buffer)?;
+    stop_tracing(run_args.trace_buffer)?;
 
     let mut tmp_path = std::env::temp_dir();
     tmp_path.push("app.ftrace");

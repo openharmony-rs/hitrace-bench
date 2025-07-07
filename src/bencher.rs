@@ -47,7 +47,11 @@ pub(crate) fn write_results(result: RunResults) {
             },
         );
 
-        (key, Bencher::Latency(map))
+        if let Some(ref pre) = result.prepend {
+            (format!("{pre}/{key}"), Bencher::Latency(map))
+        } else {
+            (key, Bencher::Latency(map))
+        }
     });
 
     let points_iter = result.point_results.into_iter().map(|(key, points)| {
@@ -66,7 +70,11 @@ pub(crate) fn write_results(result: RunResults) {
                 upper_value: Decimal::from_i128_with_scale(avg_min_max.max as i128, 0),
             },
         );
-        (key, Bencher::Latency(map))
+        if let Some(ref pre) = result.prepend {
+            (format!("{pre}/{key}"), Bencher::Latency(map))
+        } else {
+            (key, Bencher::Latency(map))
+        }
     });
 
     let b: HashMap<String, Bencher> = filters_iter.chain(points_iter).collect();

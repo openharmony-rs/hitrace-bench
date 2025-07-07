@@ -1,12 +1,57 @@
+use anyhow::anyhow;
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use serde::Deserialize;
 
-#[derive(Parser, Debug, Deserialize)]
+#[derive(Clone, Parser, Debug)]
+#[command(version, about, long_about = None)]
+pub(crate) struct Args {
+    /// Completely describes runs in the a file with the `RunConfig` json format.
+    #[arg(short, long)]
+    pub(crate) run_file: Option<PathBuf>,
+
+    /// Allowed to move files to a directory on the phone.
+    #[arg(short, long, default_value_t = false)]
+    pub(crate) is_rooted: bool,
+
+    /// Keep quiet and only print the output
+    #[arg(short, long, default_value_t = false)]
+    pub(crate) quiet: bool,
+
+    /// This is a string we prepend to every target
+    #[arg(short, long)]
+    pub(crate) prepend: Option<String>,
+
+    /// Use Bencher output format. This also does a couple of other things.
+    /// See the description in `bencher.rs`
+    #[arg(long, default_value_t = false)]
+    pub(crate) bencher: bool,
+
+    #[clap(subcommand)]
+    per_run: Option<PerRun>,
+}
+
+#[derive(Clone, Debug, Subcommand)]
+enum PerRun {
+    PerRun(RunArgs),
+}
+
+impl TryFrom<&Args> for RunArgs {
+    fn try_from(value: &Args) -> Result<Self, Self::Error> {
+        match &value.per_run {
+            Some(PerRun::PerRun(run_args)) => Ok(run_args.to_owned()),
+            None => Err(anyhow!("Could not convert")),
+        }
+    }
+
+    type Error = anyhow::Error;
+}
+
+#[derive(Clone, Parser, Debug, Deserialize)]
 #[command(version, about, long_about = None)]
 /// Run servo on an open harmony device and collect timing information
-pub(crate) struct Args {
+pub(crate) struct RunArgs {
     #[arg(short, long)]
     #[serde(default = "default_all_traces")]
     /// Show all traces for servo
@@ -37,36 +82,10 @@ pub(crate) struct Args {
     #[serde(default = "default_bundle_name")]
     pub(crate) bundle_name: String,
 
-    /// Use Bencher output format. This also does a couple of other things.
-    /// See the description in `bencher.rs`
-    #[arg(long, default_value_t = false)]
-    #[serde(default = "default_bencher")]
-    pub(crate) bencher: bool,
-
-    /// A json file describing the filters
-    #[arg(short, long)]
-    #[serde(skip)]
-    pub(crate) filter_file: Option<PathBuf>,
-
-    /// Completely describes runs in the a file with the `RunConfig` json format.
-    #[arg(short, long)]
-    #[serde(skip)]
-    pub(crate) run_file: Option<PathBuf>,
-
     /// Read traces from a file
     #[arg(long)]
     #[serde(skip)]
     pub(crate) trace_file: Option<PathBuf>,
-
-    /// Keep quiet and only print the output
-    #[arg(short, long)]
-    #[serde(skip)]
-    pub(crate) quiet: bool,
-
-    /// Allowed to move files to a directory on the phone.
-    #[arg(short, long)]
-    #[serde(default = "default_is_rooted")]
-    pub(crate) is_rooted: bool,
 
     /// These will be directly given to the hdc shell start command at the end.
     #[arg(long, trailing_var_arg(true), allow_hyphen_values(true), num_args=0..)]
@@ -74,23 +93,17 @@ pub(crate) struct Args {
     pub(crate) commands: Option<Vec<String>>,
 }
 
-#[cfg(test)]
-impl Args {
-    pub(crate) fn new(bencher: bool, quiet: bool) -> Self {
-        Args {
-            all_traces: false,
-            tries: 1,
-            url: String::from(""),
-            trace_buffer: 1,
-            sleep: 1,
-            bundle_name: String::from(""),
-            bencher,
-            filter_file: None,
+impl Default for RunArgs {
+    fn default() -> Self {
+        Self {
+            all_traces: default_all_traces(),
+            tries: default_tries(),
+            url: default_url(),
+            trace_buffer: default_trace_buffer(),
+            sleep: default_sleep(),
+            bundle_name: default_bundle_name(),
             trace_file: None,
-            is_rooted: false,
-            quiet,
-            run_file: None,
-            commands: None,
+            commands: default_commands(),
         }
     }
 }
@@ -120,14 +133,6 @@ fn default_bundle_name() -> String {
     String::from("org.servo.servo")
 }
 
-fn default_bencher() -> bool {
-    false
-}
-
 fn default_commands() -> Option<Vec<String>> {
     None
-}
-
-fn default_is_rooted() -> bool {
-    false
 }
