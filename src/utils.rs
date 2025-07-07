@@ -1,9 +1,6 @@
 use std::{collections::HashMap, iter::Sum};
 
-use thiserror::Error;
 use time::Duration;
-
-use crate::{point_filters::PointFilter, trace::Trace};
 
 pub(crate) struct AvgMingMax<T> {
     pub(crate) avg: T,
@@ -35,17 +32,6 @@ pub(crate) type FilterResults = HashMap<String, Vec<Duration>>;
 pub(crate) type FilterErrors = HashMap<String, u32>;
 pub(crate) type PointResults = HashMap<String, PointResult>;
 
-#[derive(Error, Debug)]
-pub(crate) enum PointError {
-    #[error(
-        "Too many traces are matching this pointfilter ({point_filter:?}) and combined not selected {traces:?}"
-    )]
-    TooManyTracesMatching {
-        point_filter: PointFilter,
-        traces: Vec<Trace>,
-    },
-}
-
 #[derive(Debug)]
 pub(crate) struct PointResult {
     pub(crate) no_unit_conversion: bool,
@@ -56,8 +42,12 @@ pub(crate) struct PointResult {
 /// Notice that not all vectors will have the same length as some runs might fail.
 #[derive(Debug)]
 pub(crate) struct RunResults {
+    /// A string that should be prepended to all names.
+    pub(crate) prepend: Option<String>,
     /// Filter results
     pub(crate) filter_results: FilterResults,
+    /// Filter errors
     pub(crate) errors: FilterErrors,
+    /// Point Results
     pub(crate) point_results: PointResults,
 }

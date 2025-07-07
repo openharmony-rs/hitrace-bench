@@ -1,8 +1,8 @@
-use anyhow::{Context, Result, anyhow};
-use std::{collections::HashMap, fs::File, io::BufReader, path::PathBuf};
+use anyhow::{Result, anyhow};
+use std::collections::HashMap;
 use time::Duration;
 
-use crate::{Trace, runconfig::JsonFilterDescription, trace::difference_of_traces};
+use crate::{Trace, trace::difference_of_traces};
 
 /// Way to construct filters
 pub(crate) struct Filter {
@@ -50,16 +50,4 @@ pub(crate) fn find_notable_differences<'a>(
         .iter()
         .map(|filter| filter.filter_to_duration(v))
         .collect()
-}
-
-pub(crate) fn read_filter_file(path: &PathBuf) -> Result<Vec<Filter>> {
-    let file = File::open(path)
-        .with_context(|| format!("Could not read filter file {}", path.to_string_lossy()))?;
-    let reader = BufReader::new(file);
-    let res: Vec<JsonFilterDescription> = serde_json::from_reader(reader)
-        .context("Error in decoding filter file. Please look at the specification")?;
-    Ok(res
-        .into_iter()
-        .map(|json_f| json_f.into())
-        .collect::<Vec<Filter>>())
 }

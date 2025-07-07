@@ -1,28 +1,53 @@
 use std::sync::LazyLock;
 
 use itertools::Itertools;
+use log::error;
 use regex::{Captures, Regex};
 use serde::Deserialize;
 
 use crate::{
     runconfig::RunConfig,
     trace::{Trace, TraceMarker},
-    utils::PointError,
 };
 
 const SERVO_MEMORY_PROFILING_STRING: &str = "servo_memory_profiling";
+
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) enum PointType {
+    MemoryUrl,
+    MemoryReport,
+    Smaps,
+    Testcase,
+    Combined,
+}
 
 #[derive(Debug)]
 /// A parsed trace point metric
 pub(crate) struct Point<'a> {
     /// The name you gave to this point
-    pub(crate) name: String,
+    name: String,
     /// The value of the point
     pub(crate) value: u64,
     /// Do not convert units
     pub(crate) no_unit_conversion: bool,
+    /// The type of point this matches to
+    pub(crate) point_type: PointType,
     /// The trace this matches to
     pub(crate) trace: Option<&'a Trace>,
+}
+
+impl<'a> Point<'a> {
+    pub(crate) fn name(&self, run_config: &RunConfig) -> String {
+        if let Some(ref prepend) = run_config.args.prepend
+            && run_config.args.bencher
+        {
+            format!("{prepend}/E2E/{}/{}", run_config.run_args.url, self.name)
+        } else if run_config.args.bencher {
+            format!("E2E/{}/{}", run_config.run_args.url, self.name)
+        } else {
+            self.name.to_owned()
+        }
+    }
 }
 
 /// You might want to extract data points. These do not have a beginning and end, just a point.
@@ -89,7 +114,7 @@ impl PointFilter {
             .as_str()
             .parse()
             .expect("Could not parse value");
-        if url.contains(run_config.args.url.as_str()) {
+        if url.contains(run_config.run_args.url.as_str()) {
             let mut suffix = fn_name.split('/').skip(1).join("/");
             if !suffix.is_empty() {
                 suffix.insert(0, '/');
@@ -99,6 +124,7 @@ impl PointFilter {
                 value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
+                point_type: PointType::MemoryUrl,
             })
         } else {
             None
@@ -120,29 +146,25 @@ impl PointFilter {
                 value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
+                point_type: PointType::Smaps,
             })
         }
     }
 
     fn filter_memory<'a>(&'a self, groups: Captures, trace: &'a Trace) -> Option<Point<'a>> {
-        // this regex also matches the above characters
-        //t fn_name = groups.get(1).expect("No match").as_str();
         let value = groups
             .get(2)
             .expect("Could not find match")
             .as_str()
             .parse()
             .expect("Could not parse value");
-        //if fn_name != self.match_str {
-        //            None
-        //        } else {
         Some(Point {
             name: self.name.clone(),
             value,
             no_unit_conversion: self.no_unit_conversion,
             trace: Some(trace),
+            point_type: PointType::MemoryReport,
         })
-        //      }
     }
 
     /// This filters test cases
@@ -160,6 +182,7 @@ impl PointFilter {
                 value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
+                point_type: PointType::Testcase,
             })
         } else {
             None
@@ -185,12 +208,49 @@ impl PointFilter {
         }
     }
 
+    fn remove_duplicates(&self, points: &mut Vec<Point>) {
+        if points
+            .iter()
+            .filter(|p| p.point_type == PointType::Testcase)
+            .count()
+            > 1
+        {
+            error!(
+                "PointFilter {:?} matched with multiple traces {:?}. Discarding",
+                self,
+                points
+                    .iter()
+                    .filter_map(|p| p.trace)
+                    .collect::<Vec<&Trace>>()
+            );
+            points.retain(|p| p.point_type != PointType::Testcase);
+        }
+
+        if points
+            .iter()
+            .filter(|p| p.point_type == PointType::MemoryReport)
+            .count()
+            > 1
+        {
+            error!(
+                "PointFilter {:?} matched with multiple traces {:?}. Discarding",
+                self,
+                points
+                    .iter()
+                    .filter_map(|p| p.trace)
+                    .collect::<Vec<&Trace>>()
+            );
+            points.retain(|p| p.point_type != PointType::MemoryReport);
+        }
+    }
+
+    /// Takes a a `PointFilter`, an array of traces and a run_config to create a result of matched points.
     pub(crate) fn pointfilter_to_point<'a>(
         &'a self,
         traces: &'a [Trace],
         run_config: &'a RunConfig,
-    ) -> anyhow::Result<Vec<Point<'a>>> {
-        let points: Vec<_> = traces
+    ) -> Vec<Point<'a>> {
+        let mut points: Vec<_> = traces
             .iter()
             .filter(|t| t.trace_marker == TraceMarker::Dot)
             .filter(|t| {
@@ -203,7 +263,7 @@ impl PointFilter {
 
         if self.combined {
             // we now need to collect points with the same name
-            Ok(points
+            points
                 .into_iter()
                 .into_group_map_by(|p| p.name.clone())
                 .into_iter()
@@ -216,18 +276,14 @@ impl PointFilter {
                             value: vals.iter().map(|p| p.value).sum(),
                             no_unit_conversion: vals.first().unwrap().no_unit_conversion,
                             trace: None,
+                            point_type: PointType::Combined,
                         }
                     }
                 })
-                .collect())
-        } else if points.len() > 1 {
-            Err(PointError::TooManyTracesMatching {
-                point_filter: self.to_owned(),
-                traces: points.iter().filter_map(|p| p.trace).cloned().collect(),
-            }
-            .into())
+                .collect()
         } else {
-            Ok(points)
+            self.remove_duplicates(&mut points);
+            points
         }
     }
 }
