@@ -3,7 +3,7 @@ use std::{fs::read_to_string, path::PathBuf};
 use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 
-use crate::{Args, Filter, Trace, filter::PointFilter};
+use crate::{Args, Filter, Trace, point_filters::PointFilter};
 
 /// A RunConfig including the filters
 pub(crate) struct RunConfig {
@@ -49,12 +49,12 @@ impl From<JsonFilterDescription> for Filter {
 /// A RunConfig which we can read from a file
 /// because we need JsonFilterDescription instead of filters
 #[derive(Debug, Deserialize)]
-struct RunConfigJson {
-    args: Args,
+pub(crate) struct RunConfigJson {
+    pub(crate) args: Args,
     #[serde(default)]
-    filters: Vec<JsonFilterDescription>,
+    pub(crate) filters: Vec<JsonFilterDescription>,
     #[serde(default)]
-    point_filters: Vec<PointFilter>,
+    pub(crate) point_filters: Vec<PointFilter>,
 }
 
 impl From<RunConfigJson> for RunConfig {

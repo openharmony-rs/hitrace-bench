@@ -3,7 +3,7 @@ use anyhow::{Result, anyhow};
 use std::fmt::{Debug, Display, write};
 use time::Duration;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct TimeStamp {
     pub(crate) seconds: u64,
     pub(crate) micro: u64,
@@ -15,7 +15,7 @@ impl Display for TimeStamp {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum TraceMarker {
     StartSync,
     EndSync,
@@ -37,7 +37,7 @@ impl TraceMarker {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 /// A parsed trace
 pub(crate) struct Trace {
     /// Name of the thread, i.e., `org.servo.servo`` or `Constellation`
@@ -64,21 +64,34 @@ pub(crate) struct Trace {
     pub(crate) function: String,
 }
 
+#[cfg(test)]
+impl Trace {
+    pub(crate) fn new(
+        pid: u64,
+        timestamp_secs: u64,
+        trace_marker: TraceMarker,
+        function: &str,
+    ) -> Self {
+        Trace {
+            name: "Test".to_owned(),
+            pid,
+            cpu: 1,
+            timestamp: TimeStamp {
+                seconds: timestamp_secs,
+                micro: 0,
+            },
+            trace_marker,
+            number: String::from("1"),
+            shorthand: String::from("1"),
+            function: function.to_owned(),
+        }
+    }
+}
+
 /// Calculates the timestamp difference equaivalent to trace1-trace2
 pub(crate) fn difference_of_traces(trace1: &Trace, trace2: &Trace) -> Duration {
     Duration::new(
         trace1.timestamp.seconds as i64 - trace2.timestamp.seconds as i64,
         (trace1.timestamp.micro as i32 - trace2.timestamp.micro as i32) * 1000,
     )
-}
-
-#[derive(Debug)]
-/// A parsed trace point metric
-pub(crate) struct Point {
-    /// The name you gave to this point
-    pub(crate) name: String,
-    /// The value of the point
-    pub(crate) value: u64,
-    /// Do not convert units
-    pub(crate) no_unit_conversion: bool,
 }

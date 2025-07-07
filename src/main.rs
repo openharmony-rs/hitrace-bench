@@ -1,22 +1,24 @@
 use anyhow::{Context, Result, anyhow};
 use args::Args;
 use clap::Parser;
-use filter::{Filter, PointFilter};
+use filter::Filter;
 use humanize_bytes::humanize_bytes_binary;
+use itertools::Itertools;
 use log::{error, info};
 use runconfig::RunConfig;
 use std::collections::HashMap;
 use time::Duration;
-use trace::{Point, Trace};
+use trace::Trace;
 use utils::{FilterErrors, FilterResults, PointResults, RunResults, avg_min_max};
 use yansi::{Condition, Paint};
 
-use crate::utils::PointResult;
+use crate::{point_filters::PointFilter, utils::PointResult};
 
 mod args;
 mod bencher;
 mod device;
 mod filter;
+mod point_filters;
 mod runconfig;
 mod trace;
 mod utils;
@@ -114,13 +116,13 @@ fn run_runconfig_filters(
 
 /// Process the points from thre traces. These are the traces per run_config.
 fn run_runconfig_points(run_config: &RunConfig, traces: &[Trace], points: &mut PointResults) {
-    let new_points: Vec<Point> = run_config
+    let (new_points, errors): (Vec<_>, Vec<_>) = run_config
         .point_filters
         .iter()
-        .flat_map(|f| f.pointfilter_to_point(traces, run_config))
-        .collect();
+        .map(|f| f.pointfilter_to_point(traces, run_config))
+        .partition_result();
 
-    for p in new_points {
+    for p in new_points.into_iter().flatten() {
         let key = if run_config.args.bencher {
             format!("E2E/{}/{}", run_config.args.url, p.name)
         } else {
@@ -134,13 +136,16 @@ fn run_runconfig_points(run_config: &RunConfig, traces: &[Trace], points: &mut P
                 result: vec![p.value],
             });
     }
+    if !errors.is_empty() {
+        error!("{errors:?}");
+    }
 }
 
 /// Runs one RunConfig and append the results to the results, errors and points
 fn run_runconfig(
     run_config: &RunConfig,
     results: &mut FilterResults,
-    errors: &mut FilterErrors,
+    filter_errors: &mut FilterErrors,
     points: &mut PointResults,
 ) -> Result<()> {
     for i in 1..run_config.args.tries + 1 {
@@ -151,7 +156,7 @@ fn run_runconfig(
             let log_path = device::exec_hdc_commands(&run_config.args)?;
             device::read_file(&log_path)?
         };
-        run_runconfig_filters(run_config, &traces, results, errors);
+        run_runconfig_filters(run_config, &traces, results, filter_errors);
         run_runconfig_points(run_config, &traces, points);
 
         if run_config.args.tries == 1 && run_config.args.all_traces {
@@ -171,19 +176,20 @@ fn run_runconfigs(run_configs: &Vec<RunConfig>, use_bencher: bool) -> Result<()>
     // bencher needs all runs, while a normal output can have the runs one after the other
     if use_bencher {
         let mut filter_results = HashMap::new();
-        let mut errors = HashMap::new();
+        let mut filter_errors = HashMap::new();
         let mut point_results = HashMap::new();
         for run_config in run_configs {
             run_runconfig(
                 run_config,
                 &mut filter_results,
-                &mut errors,
+                &mut filter_errors,
                 &mut point_results,
             )?;
         }
+
         bencher::write_results(RunResults {
             filter_results,
-            errors,
+            errors: filter_errors,
             point_results,
         })
     } else {

@@ -1,6 +1,9 @@
 use std::{collections::HashMap, iter::Sum};
 
+use thiserror::Error;
 use time::Duration;
+
+use crate::{point_filters::PointFilter, trace::Trace};
 
 pub(crate) struct AvgMingMax<T> {
     pub(crate) avg: T,
@@ -31,6 +34,17 @@ where
 pub(crate) type FilterResults = HashMap<String, Vec<Duration>>;
 pub(crate) type FilterErrors = HashMap<String, u32>;
 pub(crate) type PointResults = HashMap<String, PointResult>;
+
+#[derive(Error, Debug)]
+pub(crate) enum PointError {
+    #[error(
+        "Too many traces are matching this pointfilter ({point_filter:?}) and combined not selected {traces:?}"
+    )]
+    TooManyTracesMatching {
+        point_filter: PointFilter,
+        traces: Vec<Trace>,
+    },
+}
 
 #[derive(Debug)]
 pub(crate) struct PointResult {
