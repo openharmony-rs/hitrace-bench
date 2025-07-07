@@ -1,0 +1,233 @@
+use std::sync::LazyLock;
+
+use itertools::Itertools;
+use regex::{Captures, Regex};
+use serde::Deserialize;
+
+use crate::{
+    runconfig::RunConfig,
+    trace::{Trace, TraceMarker},
+    utils::PointError,
+};
+
+const SERVO_MEMORY_PROFILING_STRING: &str = "servo_memory_profiling";
+
+#[derive(Debug)]
+/// A parsed trace point metric
+pub(crate) struct Point<'a> {
+    /// The name you gave to this point
+    pub(crate) name: String,
+    /// The value of the point
+    pub(crate) value: u64,
+    /// Do not convert units
+    pub(crate) no_unit_conversion: bool,
+    /// The trace this matches to
+    pub(crate) trace: Option<&'a Trace>,
+}
+
+/// You might want to extract data points. These do not have a beginning and end, just a point.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct PointFilter {
+    /// The name we will use for this string
+    pub(crate) name: String,
+    /// We substring match on this
+    pub(crate) match_str: String,
+    /// Should we not assume this is in kb?
+    #[serde(default)]
+    pub(crate) no_unit_conversion: bool,
+    /// With this we combine all points that match a substring
+    #[serde(default)]
+    pub(crate) combined: bool,
+}
+
+/// Notice that this also matches MEMORY_URL_REPORT
+/// This is the general regexp
+/// Example: servo_memory_profiling:resident 270778368
+static MEMORY_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^servo_memory_profiling:(.*?)\s(\d+)$").expect("Could not parse regexp")
+});
+
+/// Reports that contain an url/iframe
+/// Example: servo_memory_profiling:url(https://servo.org/)/js/non-heap 262144
+static MEMORY_URL_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^servo_memory_profiling:url\((.*?)\)\/(.*?)\s(\d+)$")
+        .expect("Could not parse regexp")
+});
+
+/// resident-according-to-smaps has again a different way
+/// Example: servo_memory_profiling:resident-according-to-smaps/other 60424192
+static SMAPS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\s(\d+)$")
+        .expect("Could not parse regexp")
+});
+
+static TESTCASE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^TESTCASE_PROFILING: (.*?) (\d+)$").expect("Could not parse regexp")
+});
+
+impl PointFilter {
+    pub(crate) fn new(name: String, match_str: String) -> Self {
+        PointFilter {
+            name,
+            match_str,
+            no_unit_conversion: false,
+            combined: false,
+        }
+    }
+
+    fn filter_memory_url<'a>(
+        &'a self,
+        run_config: &RunConfig,
+        groups: Captures,
+        trace: &'a Trace,
+    ) -> Option<Point<'a>> {
+        let url = groups.get(1).expect("No match").as_str();
+        let fn_name = groups.get(2).expect("No match").as_str();
+        let value = groups
+            .get(3)
+            .expect("No match")
+            .as_str()
+            .parse()
+            .expect("Could not parse value");
+        if url.contains(run_config.args.url.as_str()) {
+            let mut suffix = fn_name.split('/').skip(1).join("/");
+            if !suffix.is_empty() {
+                suffix.insert(0, '/');
+            }
+            Some(Point {
+                name: self.name.clone() + suffix.as_str(),
+                value,
+                no_unit_conversion: self.no_unit_conversion,
+                trace: Some(trace),
+            })
+        } else {
+            None
+        }
+    }
+
+    fn filter_smaps<'a>(&'a self, groups: Captures, trace: &'a Trace) -> Option<Point<'a>> {
+        if groups.get(1).unwrap().as_str() != self.match_str {
+            None
+        } else {
+            let value = groups
+                .get(3)
+                .unwrap()
+                .as_str()
+                .parse()
+                .expect("Could not parse");
+            Some(Point {
+                name: self.name.clone(),
+                value,
+                no_unit_conversion: self.no_unit_conversion,
+                trace: Some(trace),
+            })
+        }
+    }
+
+    fn filter_memory<'a>(&'a self, groups: Captures, trace: &'a Trace) -> Option<Point<'a>> {
+        // this regex also matches the above characters
+        //t fn_name = groups.get(1).expect("No match").as_str();
+        let value = groups
+            .get(2)
+            .expect("Could not find match")
+            .as_str()
+            .parse()
+            .expect("Could not parse value");
+        //if fn_name != self.match_str {
+        //            None
+        //        } else {
+        Some(Point {
+            name: self.name.clone(),
+            value,
+            no_unit_conversion: self.no_unit_conversion,
+            trace: Some(trace),
+        })
+        //      }
+    }
+
+    /// This filters test cases
+    fn filter_testcase<'a>(&'a self, groups: Captures, trace: &'a Trace) -> Option<Point<'a>> {
+        let case_name = groups.get(1).expect("Could not find match").as_str();
+        let value = groups
+            .get(2)
+            .expect("Could not find match")
+            .as_str()
+            .parse()
+            .expect("Could not parse value");
+        if case_name.contains(&self.match_str) {
+            Some(Point {
+                name: self.name.clone(),
+                value,
+                no_unit_conversion: self.no_unit_conversion,
+                trace: Some(trace),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// this is the main filter function
+    fn filter_trace_to_option_point<'a>(
+        &'a self,
+        trace: &'a Trace,
+        run_config: &RunConfig,
+    ) -> Option<Point<'a>> {
+        if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
+            self.filter_memory_url(run_config, groups, trace)
+        } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
+            self.filter_smaps(groups, trace)
+        } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
+            self.filter_memory(groups, trace)
+        } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
+            self.filter_testcase(groups, trace)
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn pointfilter_to_point<'a>(
+        &'a self,
+        traces: &'a [Trace],
+        run_config: &'a RunConfig,
+    ) -> anyhow::Result<Vec<Point<'a>>> {
+        let points: Vec<_> = traces
+            .iter()
+            .filter(|t| t.trace_marker == TraceMarker::Dot)
+            .filter(|t| {
+                t.function.contains(SERVO_MEMORY_PROFILING_STRING)
+                    || t.function.contains("TESTCASE_PROFILING")
+            })
+            .filter(|t| t.function.contains(&self.match_str))
+            .filter_map(|t| self.filter_trace_to_option_point(t, run_config))
+            .collect();
+
+        if self.combined {
+            // we now need to collect points with the same name
+            Ok(points
+                .into_iter()
+                .into_group_map_by(|p| p.name.clone())
+                .into_iter()
+                .map(|(name, mut vals)| {
+                    if vals.len() == 1 {
+                        vals.remove(0)
+                    } else {
+                        Point {
+                            name,
+                            value: vals.iter().map(|p| p.value).sum(),
+                            no_unit_conversion: vals.first().unwrap().no_unit_conversion,
+                            trace: None,
+                        }
+                    }
+                })
+                .collect())
+        } else if points.len() > 1 {
+            Err(PointError::TooManyTracesMatching {
+                point_filter: self.to_owned(),
+                traces: points.iter().filter_map(|p| p.trace).cloned().collect(),
+            }
+            .into())
+        } else {
+            Ok(points)
+        }
+    }
+}

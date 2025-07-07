@@ -74,6 +74,27 @@ pub(crate) struct Args {
     pub(crate) commands: Option<Vec<String>>,
 }
 
+#[cfg(test)]
+impl Args {
+    pub(crate) fn new(bencher: bool, quiet: bool) -> Self {
+        Args {
+            all_traces: false,
+            tries: 1,
+            url: String::from(""),
+            trace_buffer: 1,
+            sleep: 1,
+            bundle_name: String::from(""),
+            bencher,
+            filter_file: None,
+            trace_file: None,
+            is_rooted: false,
+            quiet,
+            run_file: None,
+            commands: None,
+        }
+    }
+}
+
 // these are for serde
 fn default_all_traces() -> bool {
     false
