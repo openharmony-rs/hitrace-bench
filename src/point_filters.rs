@@ -36,14 +36,14 @@ pub(crate) struct Point<'a> {
     pub(crate) trace: Option<&'a Trace>,
 }
 
-impl<'a> Point<'a> {
+impl Point<'_> {
     pub(crate) fn name(&self, run_config: &RunConfig) -> String {
-        if let Some(ref prepend) = run_config.args.prepend
-            && run_config.args.bencher
-        {
-            format!("{prepend}/E2E/{}/{}", run_config.run_args.url, self.name)
-        } else if run_config.args.bencher {
-            format!("E2E/{}/{}", run_config.run_args.url, self.name)
+        if run_config.args.bencher {
+            if let Some(ref prepend) = run_config.args.prepend {
+                format!("{prepend}/E2E/{}/{}", run_config.run_args.url, self.name)
+            } else {
+                format!("E2E/{}/{}", run_config.run_args.url, self.name)
+            }
         } else {
             self.name.to_owned()
         }
