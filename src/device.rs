@@ -1,19 +1,9 @@
 //! Functions to handle the device
 use anyhow::{Context, Result, anyhow};
-use log::{error, info};
-use regex::Regex;
-use std::{
-    fs::File,
-    io::{BufRead, BufReader},
-    path::{Path, PathBuf},
-    process::Command,
-};
+use log::info;
+use std::{path::PathBuf, process::Command};
 
-use crate::{
-    Trace,
-    args::RunArgs,
-    trace::{TimeStamp, TraceMarker},
-};
+use crate::args::RunArgs;
 
 /// We test if the device is reachable, i.e., the list of hdc list targets is non empty.
 /// It can happen that another IDE is connected to it and then we cannot reach it (and no command fails)
@@ -52,6 +42,7 @@ struct DeviceFilePaths {
     on_device: String,
 }
 
+/// Depending on root or non-rooted we will have different file paths. This gives us these paths.
 fn device_file_paths(file_name: &str, bundle_name: &str, is_rooted: bool) -> DeviceFilePaths {
     let real_file_name = file_name.trim_start_matches("file:///");
 
@@ -79,7 +70,8 @@ pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<P
     // stop the app before starting the test
     Command::new(&hdc)
         .args(["shell", "aa", "force-stop", &run_args.bundle_name])
-        .output()?;
+        .output()
+        .context("Could not execute hdc")?;
 
     let url = if run_args.url.contains("file:///") {
         let device_file_path = device_file_paths(&run_args.url, &run_args.bundle_name, is_rooted);
@@ -181,82 +173,4 @@ pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<P
         ])
         .output()?;
     Ok(tmp_path)
-}
-
-/// There is always one trace per line
-/// This means that having no matched lines is ok and returns None. Having a parsing error returns Some(Err)
-fn line_to_trace(regex: &Regex, line: &str) -> Option<Result<Trace>> {
-    regex
-        .captures_iter(line)
-        .map(|c| c.extract())
-        .map(match_to_trace)
-        .next()
-}
-
-/// Read a regex matched line into a trace
-fn match_to_trace(
-    (
-        _line,
-        [
-            name,
-            pid,
-            cpu,
-            time1,
-            time2,
-            trace_marker,
-            number,
-            shorthand,
-            msg,
-        ],
-    ): (&str, [&str; 9]),
-) -> Result<Trace> {
-    let seconds = time1.parse()?;
-    let microseconds = time2.parse()?;
-    let timestamp = TimeStamp {
-        seconds,
-        micro: microseconds,
-    };
-    let trace_marker = TraceMarker::from(trace_marker)?;
-    Ok(Trace {
-        name: name.to_owned(),
-        pid: pid.parse().unwrap(),
-        cpu: cpu.parse().unwrap(),
-        trace_marker,
-        number: number.to_string(),
-        timestamp,
-        shorthand: shorthand.to_owned(),
-        function: msg.to_owned(),
-    })
-}
-
-/// Read a file into traces
-pub(crate) fn read_file(f: &Path) -> Result<Vec<Trace>> {
-    // This is more specific servo tracing with the tracing_mark_write
-    // Example trace: ` org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
-    let regex = Regex::new(
-        r"^\s*(.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: (.)\|(\d+?)\|(.*?):(.*)\s*$",
-    ).expect("Could not read regex");
-    let f = File::open(f)?;
-    let reader = BufReader::new(f);
-
-    let (valid_lines, invalid_lines): (Vec<_>, Vec<_>) = reader
-        .lines()
-        .enumerate()
-        .partition(|(_index, l)| l.is_ok());
-
-    if !invalid_lines.is_empty() {
-        error!(
-            "Could not read lines {:?}",
-            invalid_lines
-                .iter()
-                .map(|(index, _l)| index)
-                .collect::<Vec<_>>()
-        );
-    }
-
-    valid_lines
-        .into_iter()
-        .filter_map(|(_index, l)| line_to_trace(&regex, &l.unwrap()))
-        .collect::<Result<Vec<Trace>>>()
-        .context("Could not parse one thing")
 }

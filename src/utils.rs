@@ -2,6 +2,7 @@ use std::{collections::HashMap, iter::Sum};
 
 use time::Duration;
 
+/// Nice struct for having average, minimum, maximum and number in a handle value
 pub(crate) struct AvgMingMax<T> {
     pub(crate) avg: T,
     pub(crate) min: T,
@@ -10,6 +11,7 @@ pub(crate) struct AvgMingMax<T> {
     pub(crate) number: u16,
 }
 
+/// Compute avg min max
 pub(crate) fn avg_min_max<T, U>(values: &[T]) -> AvgMingMax<T>
 where
     T: Ord + Sum<T> + Copy + std::ops::Div<U, Output = T>,
@@ -28,10 +30,14 @@ where
     }
 }
 
+/// Results for filters
 pub(crate) type FilterResults = HashMap<String, Vec<Duration>>;
+/// Errors we found in filters
 pub(crate) type FilterErrors = HashMap<String, u32>;
+/// Results for point filters
 pub(crate) type PointResults = HashMap<String, PointResult>;
 
+/// Results for point filters
 #[derive(Debug)]
 pub(crate) struct PointResult {
     pub(crate) no_unit_conversion: bool,

@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fs::File, io::BufWriter};
 
+use anyhow::Context;
 use rust_decimal::Decimal;
 use serde::Serialize;
 use time::Duration;
@@ -30,12 +31,19 @@ enum Bencher<'a> {
     Latency(BencherLatency<'a>),
 }
 
-/// Output in bencher json format to bench.json
-/// We also will append it to the bench.json file instead of overwriting it so supsequent runs can be recorded.
-/// We also add some custom strings to the filter.
-pub(crate) fn write_results(result: RunResults) {
-    let filters_iter = result.filter_results.into_iter().map(|(key, dur_vec)| {
-        let avg_min_max = avg_min_max::<Duration, u16>(&dur_vec);
+/// Creates a bencher key adding the E2E and prepend result
+fn bencher_key(result: &RunResults, key: &str) -> String {
+    if let Some(ref pre) = result.prepend {
+        format!("{pre}/E2E/{key}")
+    } else {
+        format!("E2E/{key}")
+    }
+}
+
+/// Creates an iterator for the filter results with the appropriate map
+fn filter_iterator(result: &RunResults) -> impl std::iter::Iterator<Item = (String, Bencher<'_>)> {
+    result.filter_results.iter().map(|(key, dur_vec)| {
+        let avg_min_max = avg_min_max::<Duration, u16>(dur_vec);
         // yes we need this hashmap for the correct json
         let mut map = HashMap::new();
         map.insert(
@@ -46,15 +54,13 @@ pub(crate) fn write_results(result: RunResults) {
                 upper_value: difference_to_bencher_decimal(&avg_min_max.max),
             },
         );
+        (bencher_key(result, key), Bencher::Latency(map))
+    })
+}
 
-        if let Some(ref pre) = result.prepend {
-            (format!("{pre}/{key}"), Bencher::Latency(map))
-        } else {
-            (key, Bencher::Latency(map))
-        }
-    });
-
-    let points_iter = result.point_results.into_iter().map(|(key, points)| {
+/// Creates an iterator for the point results with the appropriate map
+fn points_iterator(result: &RunResults) -> impl std::iter::Iterator<Item = (String, Bencher)> {
+    result.point_results.iter().map(|(key, points)| {
         let name = if points.no_unit_conversion {
             "Data"
         } else {
@@ -70,20 +76,25 @@ pub(crate) fn write_results(result: RunResults) {
                 upper_value: Decimal::from_i128_with_scale(avg_min_max.max as i128, 0),
             },
         );
-        if let Some(ref pre) = result.prepend {
-            (format!("{pre}/{key}"), Bencher::Latency(map))
-        } else {
-            (key, Bencher::Latency(map))
-        }
-    });
+        (bencher_key(result, key), Bencher::Latency(map))
+    })
+}
+
+/// Output in bencher json format to bench.json
+/// We also will append it to the bench.json file instead of overwriting it so supsequent runs can be recorded.
+/// We also add some custom strings to the filter.
+pub(crate) fn write_results(result: RunResults) -> anyhow::Result<()> {
+    let filters_iter = filter_iterator(&result);
+    let points_iter = points_iterator(&result);
 
     let b: HashMap<String, Bencher> = filters_iter.chain(points_iter).collect();
 
-    let file = File::create("bench.json").expect("Could not open file");
+    let file = File::create("bench.json").context("Could not create bench.json file")?;
     let writer = BufWriter::new(file);
-    serde_json::to_writer_pretty(writer, &b).expect("Could not write json");
+    serde_json::to_writer_pretty(writer, &b).context("Could not serialize results")?;
     println!(
         "{}",
-        serde_json::to_string_pretty(&b).expect("Could not serialize")
+        serde_json::to_string_pretty(&b).context("Could not serialize results")?
     );
+    Ok(())
 }

@@ -12,57 +12,20 @@ use crate::{
 
 const SERVO_MEMORY_PROFILING_STRING: &str = "servo_memory_profiling";
 
+/// We have different type of points which have different regexp.
+/// See the statics for a detailed explanation
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum PointType {
+    /// A memory report that has an url attached, like LayoutThread.
     MemoryUrl,
+    /// A simple memory report, corresponding to resident-memory most likely.
     MemoryReport,
+    /// Report of smaps.
     Smaps,
+    /// Report of a testcase point.
     Testcase,
+    /// Something we will combine.
     Combined,
-}
-
-#[derive(Debug)]
-/// A parsed trace point metric
-pub(crate) struct Point<'a> {
-    /// The name you gave to this point
-    name: String,
-    /// The value of the point
-    pub(crate) value: u64,
-    /// Do not convert units
-    pub(crate) no_unit_conversion: bool,
-    /// The type of point this matches to
-    pub(crate) point_type: PointType,
-    /// The trace this matches to
-    pub(crate) trace: Option<&'a Trace>,
-}
-
-impl Point<'_> {
-    pub(crate) fn name(&self, run_config: &RunConfig) -> String {
-        if run_config.args.bencher {
-            if let Some(ref prepend) = run_config.args.prepend {
-                format!("{prepend}/E2E/{}/{}", run_config.run_args.url, self.name)
-            } else {
-                format!("E2E/{}/{}", run_config.run_args.url, self.name)
-            }
-        } else {
-            self.name.to_owned()
-        }
-    }
-}
-
-/// You might want to extract data points. These do not have a beginning and end, just a point.
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct PointFilter {
-    /// The name we will use for this string
-    pub(crate) name: String,
-    /// We substring match on this
-    pub(crate) match_str: String,
-    /// Should we not assume this is in kb?
-    #[serde(default)]
-    pub(crate) no_unit_conversion: bool,
-    /// With this we combine all points that match a substring
-    #[serde(default)]
-    pub(crate) combined: bool,
 }
 
 /// Notice that this also matches MEMORY_URL_REPORT
@@ -90,6 +53,36 @@ static TESTCASE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^TESTCASE_PROFILING: (.*?) (\d+)$").expect("Could not parse regexp")
 });
 
+#[derive(Debug)]
+/// A parsed trace point metric
+pub(crate) struct Point<'a> {
+    /// The name you gave to this point
+    pub(crate) name: String,
+    /// The value of the point
+    pub(crate) value: u64,
+    /// Do not convert units
+    pub(crate) no_unit_conversion: bool,
+    /// The type of point this matches to
+    pub(crate) point_type: PointType,
+    /// The trace this matches to
+    pub(crate) trace: Option<&'a Trace>,
+}
+
+/// You might want to extract data points. These do not have a beginning and end, just a point.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct PointFilter {
+    /// The name we will use for this string
+    pub(crate) name: String,
+    /// We substring match on this
+    pub(crate) match_str: String,
+    /// Should we not assume this is in kb?
+    #[serde(default)]
+    pub(crate) no_unit_conversion: bool,
+    /// With this we combine all points that match a substring
+    #[serde(default)]
+    pub(crate) combined: bool,
+}
+
 impl PointFilter {
     pub(crate) fn new(name: String, match_str: String) -> Self {
         PointFilter {
@@ -100,6 +93,7 @@ impl PointFilter {
         }
     }
 
+    /// This filters sub memory reports with a url attached.
     fn filter_memory_url<'a>(
         &'a self,
         run_config: &RunConfig,
@@ -120,7 +114,10 @@ impl PointFilter {
                 suffix.insert(0, '/');
             }
             Some(Point {
-                name: self.name.clone() + suffix.as_str(),
+                name: run_config.run_args.url.to_owned()
+                    + "/"
+                    + self.name.as_str()
+                    + suffix.as_str(),
                 value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
@@ -131,18 +128,24 @@ impl PointFilter {
         }
     }
 
-    fn filter_smaps<'a>(&'a self, groups: Captures, trace: &'a Trace) -> Option<Point<'a>> {
+    /// This filters smaps reports
+    fn filter_smaps<'a>(
+        &'a self,
+        run_config: &RunConfig,
+        groups: Captures,
+        trace: &'a Trace,
+    ) -> Option<Point<'a>> {
         if groups.get(1).unwrap().as_str() != self.match_str {
             None
         } else {
             let value = groups
                 .get(3)
-                .unwrap()
+                .expect("Could not find match")
                 .as_str()
                 .parse()
                 .expect("Could not parse");
             Some(Point {
-                name: self.name.clone(),
+                name: run_config.run_args.url.to_owned() + "/" + self.name.as_str(),
                 value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
@@ -151,7 +154,13 @@ impl PointFilter {
         }
     }
 
-    fn filter_memory<'a>(&'a self, groups: Captures, trace: &'a Trace) -> Option<Point<'a>> {
+    /// This simple memory reports
+    fn filter_memory<'a>(
+        &'a self,
+        run_config: &RunConfig,
+        groups: Captures,
+        trace: &'a Trace,
+    ) -> Option<Point<'a>> {
         let value = groups
             .get(2)
             .expect("Could not find match")
@@ -159,7 +168,7 @@ impl PointFilter {
             .parse()
             .expect("Could not parse value");
         Some(Point {
-            name: self.name.clone(),
+            name: run_config.run_args.url.to_owned() + "/" + self.name.as_str(),
             value,
             no_unit_conversion: self.no_unit_conversion,
             trace: Some(trace),
@@ -168,7 +177,12 @@ impl PointFilter {
     }
 
     /// This filters test cases
-    fn filter_testcase<'a>(&'a self, groups: Captures, trace: &'a Trace) -> Option<Point<'a>> {
+    fn filter_testcase<'a>(
+        &'a self,
+        run_config: &RunConfig,
+        groups: Captures,
+        trace: &'a Trace,
+    ) -> Option<Point<'a>> {
         let case_name = groups.get(1).expect("Could not find match").as_str();
         let value = groups
             .get(2)
@@ -178,7 +192,7 @@ impl PointFilter {
             .expect("Could not parse value");
         if case_name.contains(&self.match_str) {
             Some(Point {
-                name: self.name.clone(),
+                name: run_config.run_args.url.to_owned() + "/",
                 value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
@@ -189,7 +203,7 @@ impl PointFilter {
         }
     }
 
-    /// this is the main filter function
+    /// This is the main filter function which will call the corresponding filter functions
     fn filter_trace_to_option_point<'a>(
         &'a self,
         trace: &'a Trace,
@@ -198,16 +212,18 @@ impl PointFilter {
         if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
             self.filter_memory_url(run_config, groups, trace)
         } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
-            self.filter_smaps(groups, trace)
+            self.filter_smaps(run_config, groups, trace)
         } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
-            self.filter_memory(groups, trace)
+            self.filter_memory(run_config, groups, trace)
         } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
-            self.filter_testcase(groups, trace)
+            self.filter_testcase(run_config, groups, trace)
         } else {
             None
         }
     }
 
+    /// Check if there are duplicates for PointType::Testcase and PointType::MemoryReport.
+    /// Remove these and print errors.
     fn remove_duplicates(&self, points: &mut Vec<Point>) {
         if points
             .iter()
