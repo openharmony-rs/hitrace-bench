@@ -97,8 +97,8 @@ fn run_runconfig_filters(
     // Collect differences
     let differences = filter::find_notable_differences(traces, &run_config.filters);
     for (original_key, value) in differences.into_iter() {
-        let key = if run_config.args.bencher {
-            format!("E2E/{}/{}", run_config.run_args.url, original_key)
+        let key = if run_config.args.run_file.is_some() {
+            format!("{}/{}", run_config.run_args.url, original_key)
         } else {
             original_key.to_owned()
         };
@@ -122,7 +122,7 @@ fn run_runconfig_points(run_config: &RunConfig, traces: &[Trace], points: &mut P
         .collect();
 
     for p in new_points.into_iter().flatten() {
-        let key = p.name(run_config);
+        let key = p.name.to_owned();
         points
             .entry(key)
             .and_modify(|v| v.result.push(p.value))
@@ -142,12 +142,12 @@ fn run_runconfig(
 ) -> Result<()> {
     for i in 1..run_config.run_args.tries + 1 {
         info!("Running test {i}");
-        let traces = if let Some(ref file) = run_config.run_args.trace_file {
-            device::read_file(file)?
+        let traces = if let Some(ref file) = run_config.args.trace_file {
+            trace::read_file(file)?
         } else {
             let log_path =
                 device::exec_hdc_commands(&run_config.run_args, run_config.args.is_rooted)?;
-            device::read_file(&log_path)?
+            trace::read_file(&log_path)?
         };
         run_runconfig_filters(run_config, &traces, results, filter_errors);
         run_runconfig_points(run_config, &traces, points);
@@ -188,6 +188,7 @@ fn run_runconfigs(args: &Args, run_configs: &Vec<RunConfig>, use_bencher: bool) 
             errors: filter_errors,
             point_results,
         })
+        .context("Error in writing bencher results")?
     } else {
         for run_config in run_configs {
             let mut filter_results = HashMap::new();

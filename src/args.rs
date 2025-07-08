@@ -12,7 +12,7 @@ pub(crate) struct Args {
     pub(crate) run_file: Option<PathBuf>,
 
     /// Allowed to move files to a directory on the phone.
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     pub(crate) is_rooted: bool,
 
     /// Keep quiet and only print the output
@@ -27,6 +27,10 @@ pub(crate) struct Args {
     /// See the description in `bencher.rs`
     #[arg(long, default_value_t = false)]
     pub(crate) bencher: bool,
+
+    /// Read traces from a file
+    #[arg(long)]
+    pub(crate) trace_file: Option<PathBuf>,
 
     #[clap(subcommand)]
     per_run: Option<PerRun>,
@@ -82,11 +86,6 @@ pub(crate) struct RunArgs {
     #[serde(default = "default_bundle_name")]
     pub(crate) bundle_name: String,
 
-    /// Read traces from a file
-    #[arg(long)]
-    #[serde(skip)]
-    pub(crate) trace_file: Option<PathBuf>,
-
     /// These will be directly given to the hdc shell start command at the end.
     #[arg(long, trailing_var_arg(true), allow_hyphen_values(true), num_args=0..)]
     #[serde(default = "default_commands")]
@@ -102,7 +101,6 @@ impl Default for RunArgs {
             trace_buffer: default_trace_buffer(),
             sleep: default_sleep(),
             bundle_name: default_bundle_name(),
-            trace_file: None,
             commands: default_commands(),
         }
     }

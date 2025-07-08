@@ -1,6 +1,13 @@
 /// Functions about the traces
-use anyhow::{Result, anyhow};
-use std::fmt::{Debug, Display, write};
+use anyhow::{Context, Result, anyhow};
+use log::error;
+use regex::Regex;
+use std::{
+    fmt::{Debug, Display, write},
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+};
 use time::Duration;
 
 #[derive(Clone, Debug)]
@@ -37,7 +44,7 @@ impl TraceMarker {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 /// A parsed trace
 pub(crate) struct Trace {
     /// Name of the thread, i.e., `org.servo.servo`` or `Constellation`
@@ -62,6 +69,18 @@ pub(crate) struct Trace {
     pub(crate) shorthand: String,
     /// Full function name
     pub(crate) function: String,
+}
+
+impl Debug for Trace {
+    /// We roughly want this output but shorted
+    /// org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Trace: {}-{} ... {}.{}: {}",
+            self.name, self.pid, self.timestamp.seconds, self.timestamp.micro, self.function,
+        )
+    }
 }
 
 #[cfg(test)]
@@ -94,4 +113,82 @@ pub(crate) fn difference_of_traces(trace1: &Trace, trace2: &Trace) -> Duration {
         trace1.timestamp.seconds as i64 - trace2.timestamp.seconds as i64,
         (trace1.timestamp.micro as i32 - trace2.timestamp.micro as i32) * 1000,
     )
+}
+
+/// There is always one trace per line
+/// This means that having no matched lines is ok and returns None. Having a parsing error returns Some(Err)
+fn line_to_trace(regex: &Regex, line: &str) -> Option<Result<Trace>> {
+    regex
+        .captures_iter(line)
+        .map(|c| c.extract())
+        .map(match_to_trace)
+        .next()
+}
+
+/// Read a regex matched line into a trace
+fn match_to_trace(
+    (
+        _line,
+        [
+            name,
+            pid,
+            cpu,
+            time1,
+            time2,
+            trace_marker,
+            number,
+            shorthand,
+            msg,
+        ],
+    ): (&str, [&str; 9]),
+) -> Result<Trace> {
+    let seconds = time1.parse()?;
+    let microseconds = time2.parse()?;
+    let timestamp = TimeStamp {
+        seconds,
+        micro: microseconds,
+    };
+    let trace_marker = TraceMarker::from(trace_marker)?;
+    Ok(Trace {
+        name: name.to_owned(),
+        pid: pid.parse().unwrap(),
+        cpu: cpu.parse().unwrap(),
+        trace_marker,
+        number: number.to_string(),
+        timestamp,
+        shorthand: shorthand.to_owned(),
+        function: msg.to_owned(),
+    })
+}
+
+/// Read a file into traces
+pub(crate) fn read_file(f: &Path) -> Result<Vec<Trace>> {
+    // This is more specific servo tracing with the tracing_mark_write
+    // Example trace: ` org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
+    let regex = Regex::new(
+        r"^\s*(.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: (.)\|(\d+?)\|(.*?):(.*)\s*$",
+    ).expect("Could not read regex");
+    let f = File::open(f).context("Could not find hitrace file")?;
+    let reader = BufReader::new(f);
+
+    let (valid_lines, invalid_lines): (Vec<_>, Vec<_>) = reader
+        .lines()
+        .enumerate()
+        .partition(|(_index, l)| l.is_ok());
+
+    if !invalid_lines.is_empty() {
+        error!(
+            "Could not read lines {:?}",
+            invalid_lines
+                .iter()
+                .map(|(index, _l)| index)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    valid_lines
+        .into_iter()
+        .filter_map(|(_index, l)| line_to_trace(&regex, &l.unwrap()))
+        .collect::<Result<Vec<Trace>>>()
+        .context("Could not parse one thing")
 }
