@@ -151,8 +151,8 @@ fn match_to_trace(
     let trace_marker = TraceMarker::from(trace_marker)?;
     Ok(Trace {
         name: name.to_owned(),
-        pid: pid.parse().unwrap(),
-        cpu: cpu.parse().unwrap(),
+        pid: pid.parse().unwrap_or(0),
+        cpu: cpu.parse().unwrap_or(0),
         trace_marker,
         number: number.to_string(),
         timestamp,
@@ -161,13 +161,17 @@ fn match_to_trace(
     })
 }
 
+const REGEX_STRING: &str = concat!(
+    r"^\s*(.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: (.)\|(\d+?)\|(.*?):(.*)\s*$",
+    "|",
+    r"^\s*(.*?)\-(\d+)\s*\((.*?)\).*?(\d+)\.(\d+): tracing_mark_write: (.)\|(\d+?)\|(.*?):(.*)\s*$"
+);
+
 /// Read a file into traces
 pub(crate) fn read_file(f: &Path) -> Result<Vec<Trace>> {
     // This is more specific servo tracing with the tracing_mark_write
     // Example trace: ` org.servo.servo-44962   (  44682) [010] .... 17864.716645: tracing_mark_write: B|44682|ML: do_single_part3_compilation`
-    let regex = Regex::new(
-        r"^\s*(.*?)\-(\d+)\s*\(\s*(\d+)\).*?(\d+)\.(\d+): tracing_mark_write: (.)\|(\d+?)\|(.*?):(.*)\s*$",
-    ).expect("Could not read regex");
+    let regex = Regex::new(REGEX_STRING).expect("Could not read regex");
     let f = File::open(f).context("Could not find hitrace file")?;
     let reader = BufReader::new(f);
 
