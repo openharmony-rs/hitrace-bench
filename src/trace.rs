@@ -50,9 +50,9 @@ pub(crate) struct Trace {
     /// Name of the thread, i.e., `org.servo.servo`` or `Constellation`
     #[allow(unused)]
     pub(crate) name: String,
-    /// pid
+    /// tid, aka thread id
     #[allow(unused)]
-    pub(crate) pid: u64,
+    pub(crate) tid: u64,
     /// the cpu it ran on
     #[allow(unused)]
     pub(crate) cpu: u64,
@@ -78,7 +78,7 @@ impl Debug for Trace {
         write!(
             f,
             "Trace: {}-{} ... {}.{}: {}",
-            self.name, self.pid, self.timestamp.seconds, self.timestamp.micro, self.function,
+            self.name, self.tid, self.timestamp.seconds, self.timestamp.micro, self.function,
         )
     }
 }
@@ -86,14 +86,14 @@ impl Debug for Trace {
 #[cfg(test)]
 impl Trace {
     pub(crate) fn new(
-        pid: u64,
+        tid: u64,
         timestamp_secs: u64,
         trace_marker: TraceMarker,
         function: &str,
     ) -> Self {
         Trace {
             name: "Test".to_owned(),
-            pid,
+            tid,
             cpu: 1,
             timestamp: TimeStamp {
                 seconds: timestamp_secs,
@@ -131,7 +131,7 @@ fn match_to_trace(
         _line,
         [
             name,
-            pid,
+            tid,
             cpu,
             time1,
             time2,
@@ -151,7 +151,7 @@ fn match_to_trace(
     let trace_marker = TraceMarker::from(trace_marker)?;
     Ok(Trace {
         name: name.to_owned(),
-        pid: pid.parse().unwrap_or(0),
+        tid: tid.parse().unwrap_or(0),
         cpu: cpu.parse().unwrap_or(0),
         trace_marker,
         number: number.to_string(),
