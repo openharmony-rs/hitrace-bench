@@ -32,24 +32,34 @@ pub(crate) enum PointType {
 /// This is the general regexp
 /// Example: servo_memory_profiling:resident 270778368
 static MEMORY_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"^servo_memory_profiling:(.*?)\s(\d+)$|^servo_memory_profiling:(.*?)\|(\d+)\|\w*\d+$",
-    )
+    Regex::new(concat!(
+        r"^servo_memory_profiling:(.*?)\s(\d+)$",
+        "|",
+        r"^servo_memory_profiling:(.*?)\|(\d+)\|\w*\d+$"
+    ))
     .expect("Could not parse regexp")
 });
 
 /// Reports that contain an url/iframe
 /// Example: servo_memory_profiling:url(https://servo.org/)/js/non-heap 262144
 static MEMORY_URL_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^servo_memory_profiling:url\((.*?)\)\/(.*?)\s(\d+)$|^servo_memory_profiling:url\((.*?)\)\/(.*?)\|(\d+)\|\w*\d+$")
-        .expect("Could not parse regexp")
+    Regex::new(concat!(
+        r"^servo_memory_profiling:url\((.*?)\)\/(.*?)\s(\d+)$",
+        "|",
+        r"^servo_memory_profiling:url\((.*?)\)\/(.*?)\|(\d+)\|\w*\d+$"
+    ))
+    .expect("Could not parse regexp")
 });
 
 /// resident-according-to-smaps has again a different way
 /// Example: servo_memory_profiling:resident-according-to-smaps/other 60424192
 static SMAPS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\s(\d+)$|^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\|(\d+)\|\w*\d+$")
-        .expect("Could not parse regexp")
+    Regex::new(concat!(
+        r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\s(\d+)$",
+        "|",
+        r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\|(\d+)\|\w*\d+$"
+    ))
+    .expect("Could not parse regexp")
 });
 
 static TESTCASE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
