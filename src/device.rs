@@ -127,6 +127,7 @@ pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<P
         "js_disable_jit=true",
         "--ps=--tracing-filter",
         "trace",
+        "--psn=--pref=largest_contentful_paint_enabled=true",
     ];
     if let Some(ref v) = run_args.commands {
         let mut v = v.iter().map(|s| s.as_str()).collect();

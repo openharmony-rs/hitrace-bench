@@ -1,0 +1,68 @@
+# tracer: nop
+#                                          _-----=> irqs-off
+#                                         / _----=> need-resched
+#                                        | / _---=> hardirq/softirq
+#                                        || / _--=> preempt-depth
+#                                        ||| /     delay
+#           TASK-PID       TGID    CPU#  ||||   TIMESTAMP  FUNCTION
+#              | |           |       |   ||||      |         |
+           <...>-57783   (-------) [010] .... 510487.404088: tracing_mark_write: B|57783|H:on_surface_created_cb|M62
+           <...>-57910   (-------) [008] .... 510488.157428: tracing_mark_write: B|57783|H:load status changed HeadParsed|M62
+           <...>-57910   (-------) [010] .... 510490.232042: tracing_mark_write: B|57783|H:PageLoadEndedPrompt|M62
+           <...>-58089   (-------) [010] .... 510490.313831: tracing_mark_write: C|57783|H:servo_memory_profiling:vsize|45766221824|M62
+           <...>-58089   (-------) [010] .... 510490.313834: tracing_mark_write: C|57783|H:servo_memory_profiling:resident|403623936|M62
+           <...>-58089   (-------) [010] .... 510490.313836: tracing_mark_write: C|57783|H:servo_memory_profiling:pss|282854|M62
+           <...>-58089   (-------) [010] .... 510490.313838: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps/[anon:ArkTS Code:386504056832] (rw-p)|1290240|M62
+           <...>-58089   (-------) [010] .... 510490.313840: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//vendor/lib64/passthrough/libhvgr_v200.so (r-xp)|1646592|M62
+           <...>-58089   (-------) [010] .... 510490.313843: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//data/app/el1/bundle/public/com.huawei.hmos.arkwebcore/libs/arm64/libarkweb_engine.so (rw-p)|581632|M62
+           <...>-58089   (-------) [010] .... 510490.313844: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/platformsdk/libark_jsruntime.so (r-xp)|2072576|M62
+           <...>-58089   (-------) [010] .... 510490.313845: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps/other|65134592|M62
+           <...>-58089   (-------) [010] .... 510490.313847: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps/[anon:libace_compatible.z.so.bss] (rw-p)|700416|M62
+           <...>-58089   (-------) [010] .... 510490.313848: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps/[anon:libmedialibrary_nutils.z.so.bss] (rw-p)|741376|M62
+           <...>-58089   (-------) [010] .... 510490.313849: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/libark_llvmcodegen.so (r--p)|999424|M62
+           <...>-58089   (-------) [010] .... 510490.313851: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//data/app/el1/bundle/public/com.huawei.hmos.arkwebcore/libs/arm64/libarkweb_engine.so (r--p)|8773632|M62
+           <...>-58089   (-------) [010] .... 510490.313852: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/lib/ld-musl-aarch64.so.1 (r-xp)|1327104|M62
+           <...>-58089   (-------) [010] .... 510490.313853: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps/[anon:native_heap:jemalloc] (rw-p)|255057920|M62
+           <...>-58089   (-------) [010] .... 510490.313854: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//data/storage/el1/bundle/libs/arm64/libservoshell.so (r--p)|15114240|M62
+           <...>-58089   (-------) [010] .... 510490.313855: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/ndk/libffrt.so (r-xp)|602112|M62
+           <...>-58089   (-------) [010] .... 510490.313856: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/platformsdk/libace_compatible.z.so (r-xp)|6975488|M62
+           <...>-58089   (-------) [010] .... 510490.313857: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/module/arkcompiler/stub.an (r-xp)|589824|M62
+           <...>-58089   (-------) [010] .... 510490.313859: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//data/storage/el1/bundle/libs/arm64/libservoshell.so (r-xp)|26406912|M62
+           <...>-58089   (-------) [010] .... 510490.313860: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//data/storage/el1/bundle/libs/arm64/libservoshell.so (rw-p)|593920|M62
+           <...>-58089   (-------) [010] .... 510490.313861: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/platformsdk/libappkit_native.z.so (r-xp)|860160|M62
+           <...>-58089   (-------) [010] .... 510490.313862: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/fonts/NotoSansCJK-Regular.ttc (r--p)|663552|M62
+           <...>-58089   (-------) [010] .... 510490.313863: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps/[anon:js-gc-heap] (rw-p)|729088|M62
+           <...>-58089   (-------) [010] .... 510490.313864: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//vendor/lib64/passthrough/indirect/libbishenggpucompiler_v200.so.15 (r--p)|4308992|M62
+           <...>-58089   (-------) [010] .... 510490.313865: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/libskia_canvaskit.z.so (r-xp)|1101824|M62
+           <...>-58089   (-------) [010] .... 510490.313867: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/librender_service_client.z.so (r-xp)|602112|M62
+           <...>-58089   (-------) [010] .... 510490.313868: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps/[anon:native_heap:jemalloc meta] (rw-p)|1122304|M62
+           <...>-58089   (-------) [010] .... 510490.313869: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/libwm.z.so (r-xp)|610304|M62
+           <...>-58089   (-------) [010] .... 510490.313870: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/platformsdk/libace_compatible.z.so (r--p)|5423104|M62
+           <...>-58089   (-------) [010] .... 510490.313872: tracing_mark_write: C|57783|H:servo_memory_profiling:resident-according-to-smaps/[anon:libark_jsoptimizer.so.bss] (rw-p)|610304|M62
+           <...>-58089   (-------) [010] .... 510490.313874: tracing_mark_write: C|57783|H:servo_memory_profiling:webrender/fonts|81920|M62
+           <...>-58089   (-------) [010] .... 510490.313875: tracing_mark_write: C|57783|H:servo_memory_profiling:webrender/images|90554368|M62
+           <...>-58089   (-------) [010] .... 510490.313876: tracing_mark_write: C|57783|H:servo_memory_profiling:webrender/display-list|116416|M62
+           <...>-58089   (-------) [010] .... 510490.313877: tracing_mark_write: C|57783|H:servo_memory_profiling:paint/scroll-tree|1288|M62
+           <...>-58089   (-------) [010] .... 510490.313879: tracing_mark_write: C|57783|H:servo_memory_profiling:system-fonts|29944|M62
+           <...>-58089   (-------) [010] .... 510490.313880: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/display-list|0|M62
+           <...>-58089   (-------) [010] .... 510490.313881: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/stylist|498871|M62
+           <...>-58089   (-------) [010] .... 510490.313882: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/font-context|396720|M62
+           <...>-58089   (-------) [010] .... 510490.313883: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/box-tree|84708496|M62
+           <...>-58089   (-------) [010] .... 510490.313884: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/fragment-tree|112|M62
+           <...>-58089   (-------) [010] .... 510490.313885: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/stacking-context-tree|167760|M62
+           <...>-58089   (-------) [010] .... 510490.313887: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/image-cache|3718280|M62
+           <...>-58089   (-------) [010] .... 510490.313888: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/image-cache/fontdb|0|M62
+           <...>-58089   (-------) [010] .... 510490.313889: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/js/gc-heap/used|541520|M62
+           <...>-58089   (-------) [010] .... 510490.313890: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/js/gc-heap/unused|139248|M62
+           <...>-58089   (-------) [010] .... 510490.313891: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/js/gc-heap/admin|27840|M62
+           <...>-58089   (-------) [010] .... 510490.313892: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/js/gc-heap/decommitted|339968|M62
+           <...>-58089   (-------) [010] .... 510490.313893: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/js/malloc-heap|5483027|M62
+           <...>-58089   (-------) [010] .... 510490.313894: tracing_mark_write: C|57783|H:servo_memory_profiling:url(https://servo.org/)/js/non-heap|262144|M62
+           <...>-58089   (-------) [010] .... 510490.313895: tracing_mark_write: C|57783|H:servo_memory_profiling:storage/local|0|M62
+           <...>-58089   (-------) [010] .... 510490.313897: tracing_mark_write: C|57783|H:servo_memory_profiling:storage/session|0|M62
+           <...>-58089   (-------) [010] .... 510490.313898: tracing_mark_write: C|57783|H:servo_memory_profiling:memory-cache/public|2253616|M62
+           <...>-58089   (-------) [010] .... 510490.313899: tracing_mark_write: C|57783|H:servo_memory_profiling:hsts-list/public|552|M62
+           <...>-58089   (-------) [010] .... 510490.313900: tracing_mark_write: C|57783|H:servo_memory_profiling:memory-cache/private|0|M62
+           <...>-58089   (-------) [010] .... 510490.313901: tracing_mark_write: C|57783|H:servo_memory_profiling:hsts-list/private|0|M62
+           <...>-58089   (-------) [010] .... 510490.313902: tracing_mark_write: C|57783|H:servo_memory_profiling:hsts-preload-list|2097152|M62
+           <...>-58089   (-------) [010] .... 510490.313903: tracing_mark_write: C|57783|H:servo_memory_profiling:public-suffix-list|602536|M62

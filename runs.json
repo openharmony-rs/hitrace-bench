@@ -5,7 +5,7 @@
     {
         "run_args": {
             "url": "https://www.google.com", // the url to test
-            "tries": 5 // How many repeated tries we should have, we show the min,max,avg in the output
+            "tries": 1 // How many repeated tries we should have, we show the min,max,avg in the output
             //"trace_buffer": 524288,   // trace_buffer size of hitrace
             //"sleep": 10,  // how long should we wait for servo to load the page
             //"commands": ["--ps=--tracing-filter", "info"] // arbitrary additional arguments
@@ -55,7 +55,7 @@
     {
         "run_args": {
             "url": "https://www.servo.org",
-            "tries": 5
+            "tries": 1
         },
         "filters": [
             {
@@ -89,6 +89,11 @@
                 "name": "resident-smaps",
                 "match_str": "resident-according-to-smaps",
                 "combined": true
+            },
+            {
+                "name": "largesetcontentfullpaint",
+                "match_str": "LargestContentfulPaint",
+                "combined": true
             }
         ]
     },
@@ -96,7 +101,7 @@
         "run_args": {
             "bencher": true,
             "url": "file:///parse_from_string.html",
-            "tries": 5
+            "tries": 1
         },
         "filters": [
         ],

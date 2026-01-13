@@ -35,6 +35,10 @@ static MEMORY_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^servo_memory_profiling:(.*?)\s(\d+)$").expect("Could not parse regexp")
 });
 
+static MEMORY_REPORT_REGEX_V5_1_1: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^servo_memory_profiling:(.*?)\|(\d+)").expect("Could not parse regexp")
+});
+
 /// Reports that contain an url/iframe
 /// Example: servo_memory_profiling:url(https://servo.org/)/js/non-heap 262144
 static MEMORY_URL_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
@@ -42,10 +46,20 @@ static MEMORY_URL_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
         .expect("Could not parse regexp")
 });
 
+static MEMORY_URL_REPORT_REGEX_V5_1_1: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^servo_memory_profiling:url\((.*?)\)\/(.*?)\|(\d+)")
+        .expect("Could not parse regexp")
+});
+
 /// resident-according-to-smaps has again a different way
 /// Example: servo_memory_profiling:resident-according-to-smaps/other 60424192
 static SMAPS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\s(\d+)$")
+        .expect("Could not parse regexp")
+});
+
+static SMAPS_REGEX_V5_1_1: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\|(\d+)")
         .expect("Could not parse regexp")
 });
 
@@ -209,11 +223,19 @@ impl PointFilter {
         trace: &'a Trace,
         run_config: &RunConfig,
     ) -> Option<Point<'a>> {
+        // println!("{:?}", trace.function);
+        // return  None;
         if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
+            self.filter_memory_url(run_config, groups, trace)
+        } else if let Some(groups) = MEMORY_URL_REPORT_REGEX_V5_1_1.captures(&trace.function) {
             self.filter_memory_url(run_config, groups, trace)
         } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
             self.filter_smaps(run_config, groups, trace)
+        } else if let Some(groups) = SMAPS_REGEX_V5_1_1.captures(&trace.function) {
+            self.filter_smaps(run_config, groups, trace)
         } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
+            self.filter_memory(run_config, groups, trace)
+        } else if let Some(groups) = MEMORY_REPORT_REGEX_V5_1_1.captures(&trace.function) {
             self.filter_memory(run_config, groups, trace)
         } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
             self.filter_testcase(run_config, groups, trace)
