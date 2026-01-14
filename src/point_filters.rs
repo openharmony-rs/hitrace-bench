@@ -151,11 +151,18 @@ impl PointFilter {
         groups: Captures,
         trace: &'a Trace,
     ) -> Option<Point<'a>> {
-        if groups.name("smapstag_option_1").or_else(|| groups.name("smapstag_option_2")).unwrap().as_str() != self.match_str {
+        if groups
+            .name("smapstag_option_1")
+            .or_else(|| groups.name("smapstag_option_2"))
+            .unwrap()
+            .as_str()
+            != self.match_str
+        {
             None
         } else {
             let value = groups
-                .name("value_option_1").or_else(|| groups.name("value_option_2"))
+                .name("value_option_1")
+                .or_else(|| groups.name("value_option_2"))
                 .expect("Could not find match")
                 .as_str()
                 .parse()
