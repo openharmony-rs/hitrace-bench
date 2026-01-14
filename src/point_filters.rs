@@ -33,9 +33,9 @@ pub(crate) enum PointType {
 /// Example: servo_memory_profiling:resident 270778368
 static MEMORY_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
-        r"^servo_memory_profiling:(.*?)\s(\d+)$",
+        r"^servo_memory_profiling:(.*?)\s(?:<value>\d+)$",
         "|",
-        r"^servo_memory_profiling:(.*?)\|(\d+)\|\w*\d+$"
+        r"^servo_memory_profiling:(.*?)\|(?:<value>\d+)\|\w*\d+$"
     ))
     .expect("Could not parse regexp")
 });
@@ -44,9 +44,9 @@ static MEMORY_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 /// Example: servo_memory_profiling:url(https://servo.org/)/js/non-heap 262144
 static MEMORY_URL_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
-        r"^servo_memory_profiling:url\((.*?)\)\/(.*?)\s(\d+)$",
+        r"^servo_memory_profiling:url\((?:<url>.*?)\)\/(?:<fn_name>.*?)\s(?:<value>\d+)$",
         "|",
-        r"^servo_memory_profiling:url\((.*?)\)\/(.*?)\|(\d+)\|\w*\d+$"
+        r"^servo_memory_profiling:url\((?:<url>.*?)\)\/(?:<fn_name>.*?)\|(?:<value>\d+)\|\w*\d+$"
     ))
     .expect("Could not parse regexp")
 });
@@ -55,15 +55,15 @@ static MEMORY_URL_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 /// Example: servo_memory_profiling:resident-according-to-smaps/other 60424192
 static SMAPS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
-        r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\s(\d+)$",
+        r"^servo_memory_profiling:(?:<smapstag>resident-according-to-smaps)\/(.*)\s(?:<value>\d+)$",
         "|",
-        r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\|(\d+)\|\w*\d+$"
+        r"^servo_memory_profiling:(?:<smapstag>resident-according-to-smaps)\/(.*)\|(?:<value>\d+)\|\w*\d+$"
     ))
     .expect("Could not parse regexp")
 });
 
 static TESTCASE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^TESTCASE_PROFILING: (.*?) (\d+)$").expect("Could not parse regexp")
+    Regex::new(r"^TESTCASE_PROFILING: (?:<case_name>.*?) (?:<value>\d+)$").expect("Could not parse regexp")
 });
 
 #[derive(Debug)]
@@ -113,10 +113,10 @@ impl PointFilter {
         groups: Captures,
         trace: &'a Trace,
     ) -> Option<Point<'a>> {
-        let url = groups.get(1).expect("No match").as_str();
-        let fn_name = groups.get(2).expect("No match").as_str();
+        let url = groups.name("url").expect("No match").as_str();
+        let fn_name = groups.name("fn_name").expect("No match").as_str();
         let value = groups
-            .get(3)
+            .name("value")
             .expect("No match")
             .as_str()
             .parse()
@@ -148,11 +148,11 @@ impl PointFilter {
         groups: Captures,
         trace: &'a Trace,
     ) -> Option<Point<'a>> {
-        if groups.get(1).unwrap().as_str() != self.match_str {
+        if groups.name("smapstag").unwrap().as_str() != self.match_str {
             None
         } else {
             let value = groups
-                .get(3)
+                .name("value")
                 .expect("Could not find match")
                 .as_str()
                 .parse()
@@ -175,7 +175,7 @@ impl PointFilter {
         trace: &'a Trace,
     ) -> Option<Point<'a>> {
         let value = groups
-            .get(2)
+            .name("value")
             .expect("Could not find match")
             .as_str()
             .parse()
@@ -196,9 +196,9 @@ impl PointFilter {
         groups: Captures,
         trace: &'a Trace,
     ) -> Option<Point<'a>> {
-        let case_name = groups.get(1).expect("Could not find match").as_str();
+        let case_name = groups.name("case_name").expect("Could not find match").as_str();
         let value = groups
-            .get(2)
+            .name("value")
             .expect("Could not find match")
             .as_str()
             .parse()
