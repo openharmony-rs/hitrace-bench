@@ -22,6 +22,14 @@ fn parsing_v1() {
     });
 }
 
+#[test]
+fn parsing_v5() {
+    parsing_common(Testcase {
+        input_file_path: PathBuf::from("testdata/v5_1_1.ftrace"),
+        output_file_str: include_str!("../testdata/v5_1_1_output.json"),
+    });
+}
+
 fn parsing_common(testcase: Testcase) {
     let (input, output) = (testcase.input_file_path, testcase.output_file_str);
 
