@@ -84,10 +84,7 @@ fn points_iterator(result: &RunResults) -> impl std::iter::Iterator<Item = (Stri
 /// We also will append it to the bench.json file instead of overwriting it so supsequent runs can be recorded.
 /// We also add some custom strings to the filter.
 pub(crate) fn write_results(result: RunResults) -> anyhow::Result<()> {
-    let filters_iter = filter_iterator(&result);
-    let points_iter = points_iterator(&result);
-
-    let b: HashMap<String, Bencher> = filters_iter.chain(points_iter).collect();
+    let b = generate_results_hashmap(&result);
 
     let file = File::create("bench.json").context("Could not create bench.json file")?;
     let writer = BufWriter::new(file);
@@ -97,4 +94,18 @@ pub(crate) fn write_results(result: RunResults) -> anyhow::Result<()> {
         serde_json::to_string_pretty(&b).context("Could not serialize results")?
     );
     Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn generate_result_json_str(result: RunResults) -> anyhow::Result<String> {
+    let b = generate_results_hashmap(&result);
+    serde_json::to_string_pretty(&b).context("Could not serialize results")
+}
+
+fn generate_results_hashmap<'a>(result: &'a RunResults) -> HashMap<String, Bencher<'a>> {
+    let filters_iter = filter_iterator(result);
+    let points_iter = points_iterator(result);
+
+    // let b: HashMap<String, Bencher> = filters_iter.chain(points_iter).collect();
+    filters_iter.chain(points_iter).collect()
 }
