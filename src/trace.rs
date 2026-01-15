@@ -83,30 +83,6 @@ impl Debug for Trace {
     }
 }
 
-#[cfg(test)]
-impl Trace {
-    pub(crate) fn new(
-        tid: u64,
-        timestamp_secs: u64,
-        trace_marker: TraceMarker,
-        function: &str,
-    ) -> Self {
-        Trace {
-            name: "Test".to_owned(),
-            tid,
-            cpu: 1,
-            timestamp: TimeStamp {
-                seconds: timestamp_secs,
-                micro: 0,
-            },
-            trace_marker,
-            number: String::from("1"),
-            shorthand: String::from("1"),
-            function: function.to_owned(),
-        }
-    }
-}
-
 /// Calculates the timestamp difference equaivalent to trace1-trace2
 pub(crate) fn difference_of_traces(trace1: &Trace, trace2: &Trace) -> Duration {
     Duration::new(

@@ -1,0 +1,64 @@
+# tracer: nop
+#                                          _-----=> irqs-off
+#                                         / _----=> need-resched
+#                                        | / _---=> hardirq/softirq
+#                                        || / _--=> preempt-depth
+#                                        ||| /     delay
+#           TASK-PID       TGID    CPU#  ||||   TIMESTAMP  FUNCTION
+#              | |           |       |   ||||      |         |
+ org.servo.servo-46512   (  46512) [010] .... 7230472.274412: tracing_mark_write: B|46512|H:on_surface_created_cb 
+ org.servo.servo-46660   (  46512) [009] .... 7230473.141167: tracing_mark_write: B|46512|H:load status changed HeadParsed 
+ org.servo.servo-46660   (  46512) [010] .... 7230474.245382: tracing_mark_write: B|46512|H:PageLoadEndedPrompt 
+
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327149: tracing_mark_write: C|46512|H:servo_memory_profiling:system-fonts 28896
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327152: tracing_mark_write: C|46512|H:servo_memory_profiling:memory-cache/public 5343816
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327154: tracing_mark_write: C|46512|H:servo_memory_profiling:hsts-list/public 552
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327156: tracing_mark_write: C|46512|H:servo_memory_profiling:memory-cache/private 0
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327158: tracing_mark_write: C|46512|H:servo_memory_profiling:hsts-list/private 0
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327159: tracing_mark_write: C|46512|H:servo_memory_profiling:hsts-preload-list 2097152
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327161: tracing_mark_write: C|46512|H:servo_memory_profiling:public-suffix-list 602536
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327163: tracing_mark_write: C|46512|H:servo_memory_profiling:webrender/fonts 122880
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327165: tracing_mark_write: C|46512|H:servo_memory_profiling:webrender/images 112836608
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327167: tracing_mark_write: C|46512|H:servo_memory_profiling:webrender/display-list 116416
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327168: tracing_mark_write: C|46512|H:servo_memory_profiling:paint/scroll-tree 1288
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327171: tracing_mark_write: C|46512|H:servo_memory_profiling:vsize 12803051520
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327172: tracing_mark_write: C|46512|H:servo_memory_profiling:resident 392593408
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327173: tracing_mark_write: C|46512|H:servo_memory_profiling:pss 338955
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327176: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps/[anon:native_heap:jemalloc meta] (rw-p) 712704
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327179: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/libwm.z.so (r-xp) 569344
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327182: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//vendor/lib64/chipsetsdk/libbishenggpucompiler_v200.so.15 (r--p) 4255744
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327184: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/platformsdk/libark_jsruntime.so (r-xp) 1998848
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327186: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//data/storage/el1/bundle/libs/arm64/libservoshell.so (r-xp) 25686016
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327187: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/libskia_canvaskit.z.so (r--p) 675840
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327188: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/librender_service_client.z.so (r-xp) 524288
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327190: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/platformsdk/libace_compatible.z.so (r-xp) 6938624
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327192: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//vendor/lib64/chipsetsdk/libbishenggpucompiler_v200.so.15 (r-xp) 9498624
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327193: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps/[anon:js-gc-heap] (rw-p) 536576
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327195: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/platformsdk/libappkit_native.z.so (r-xp) 585728
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327196: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/lib2d_graphics.z.so (r-xp) 606208
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327197: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/platformsdk/libace_compatible.z.so (r--p) 1642496
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327199: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps/other 41635840
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327200: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//vendor/lib64/chipsetsdk/libhvgr_v200.so (r-xp) 1658880
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327202: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//system/fonts/NotoSansCJK-Regular.ttc (r--p) 663552
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327204: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//data/storage/el1/bundle/libs/arm64/libservoshell.so (rw-p) 557056
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327206: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//system/lib/ld-musl-aarch64.so.1 (r-xp) 1351680
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327207: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps/[stack] (rw-p) 1073152
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327210: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps/[anon:native_heap:jemalloc] (rw-p) 280064000
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327211: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//data/storage/el1/bundle/libs/arm64/libservoshell.so (r--p) 13316096
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327213: tracing_mark_write: C|46512|H:servo_memory_profiling:resident-according-to-smaps//system/lib64/libskia_canvaskit.z.so (r-xp) 1007616
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327215: tracing_mark_write: C|46512|H:servo_memory_profiling:storage/local 0
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327216: tracing_mark_write: C|46512|H:servo_memory_profiling:storage/session 0
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327218: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/display-list 0
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327219: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/stylist 495351
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327221: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/font-context 1179436
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327222: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/box-tree 84684320
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327224: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/fragment-tree 112
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327225: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/layout-thread/stacking-context-tree 167760
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327226: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/image-cache 16040640
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327228: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/image-cache/fontdb 0
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327230: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/js/gc-heap/used 541960
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327231: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/js/gc-heap/unused 138808
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327233: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/js/gc-heap/admin 27840
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327235: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/js/gc-heap/decommitted 339968
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327237: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/js/malloc-heap 5497043
+ org.servo.servo-46888   (  46512) [010] .... 7230474.327238: tracing_mark_write: C|46512|H:servo_memory_profiling:url(https://servo.org/)/js/non-heap 262144

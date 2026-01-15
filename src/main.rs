@@ -19,6 +19,7 @@ mod device;
 mod filter;
 mod point_filters;
 mod runconfig;
+mod test;
 mod trace;
 mod utils;
 
@@ -134,7 +135,7 @@ fn run_runconfig_points(run_config: &RunConfig, traces: &[Trace], points: &mut P
 }
 
 /// Runs one RunConfig and append the results to the results, errors and points
-fn run_runconfig(
+pub(crate) fn run_runconfig(
     run_config: &RunConfig,
     results: &mut FilterResults,
     filter_errors: &mut FilterErrors,

@@ -36,6 +36,21 @@ pub(crate) struct Args {
     per_run: Option<PerRun>,
 }
 
+impl Args {
+    #[cfg(test)]
+    pub(crate) fn test_default(path: PathBuf) -> Args {
+        Args {
+            run_file: None,
+            is_rooted: false,
+            quiet: false,
+            prepend: None,
+            bencher: true,
+            trace_file: Some(path),
+            per_run: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Subcommand)]
 enum PerRun {
     PerRun(RunArgs),
