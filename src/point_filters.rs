@@ -113,16 +113,18 @@ impl PointFilter {
         groups: Captures,
         trace: &'a Trace,
     ) -> Option<Point<'a>> {
-        let url = groups.get(1).expect("No match").as_str();
-        let fn_name = groups.get(2).expect("No match").as_str();
-        let value = groups
-            .get(3)
+        let mut match_iter = groups.iter().flatten();
+        let _whole_match = match_iter.next();
+        let url = match_iter.next().expect("No match").as_str();
+        let subsystem_path = match_iter.next().expect("No match").as_str();
+        let value = match_iter
+            .next()
             .expect("No match")
             .as_str()
             .parse()
             .expect("Could not parse value");
         if url.contains(run_config.run_args.url.as_str()) {
-            let mut suffix = fn_name.split('/').skip(1).join("/");
+            let mut suffix = subsystem_path.split('/').skip(1).join("/");
             if !suffix.is_empty() {
                 suffix.insert(0, '/');
             }
@@ -148,11 +150,15 @@ impl PointFilter {
         groups: Captures,
         trace: &'a Trace,
     ) -> Option<Point<'a>> {
-        if groups.get(1).unwrap().as_str() != self.match_str {
+        let mut match_iter = groups.iter().flatten();
+        let _whole_match = match_iter.next();
+        let match_str = match_iter.next().unwrap().as_str();
+        let _fn_name = match_iter.next();
+        if match_str != self.match_str {
             None
         } else {
-            let value = groups
-                .get(3)
+            let value = match_iter
+                .next()
                 .expect("Could not find match")
                 .as_str()
                 .parse()
@@ -174,8 +180,12 @@ impl PointFilter {
         groups: Captures,
         trace: &'a Trace,
     ) -> Option<Point<'a>> {
-        let value = groups
-            .get(2)
+        let mut match_iter = groups.iter().flatten();
+        let _whole_match = match_iter.next();
+        let _name = match_iter.next();
+
+        let value = match_iter
+            .next()
             .expect("Could not find match")
             .as_str()
             .parse()
