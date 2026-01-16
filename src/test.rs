@@ -1,4 +1,6 @@
 #![cfg(test)]
+use serde_json::json;
+
 use crate::args::Args;
 use crate::bencher::generate_result_json_str;
 use crate::run_runconfig;
@@ -8,6 +10,9 @@ use crate::{
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
+
+const V1_INPUT_PATH_STR: &str = "testdata/v1.ftrace";
+const V5_INPUT_PATH_STR: &str = "testdata/v5_1_1.ftrace";
 
 struct Testcase<'a> {
     input_file_path: PathBuf,
@@ -28,6 +33,79 @@ fn parsing_v5() {
         input_file_path: PathBuf::from("testdata/v5_1_1.ftrace"),
         output_file_str: include_str!("../testdata/v5_1_1_output.json"),
     });
+}
+
+#[test]
+fn test_testcase_regex() {
+    let point_filters = vec![PointFilter {
+        name: String::from("TESTCASE_PROFILING"),
+        match_str: String::from("generatehtml"),
+        no_unit_conversion: true,
+        combined: false,
+    }];
+
+    let expected_json = json!({
+        "E2E/https://servo.org/": {
+            "Data": {
+                "lower_value": 1720.0,
+                "upper_value": 1720.0,
+                "value": 1720.0
+            }
+        }
+    });
+
+    assert_eq!(
+        test_filters(
+            PathBuf::from(V1_INPUT_PATH_STR),
+            vec![],
+            point_filters.clone()
+        )
+        .unwrap(),
+        expected_json
+    );
+    assert_eq!(
+        test_filters(
+            PathBuf::from(V5_INPUT_PATH_STR),
+            vec![],
+            point_filters.clone()
+        )
+        .unwrap(),
+        expected_json
+    );
+}
+
+fn test_filters(
+    input_file: PathBuf,
+    filter: Vec<Filter>,
+    point_filters: Vec<PointFilter>,
+) -> Option<serde_json::Value> {
+    let args = Args::test_default(input_file);
+
+    let mut filter_results = HashMap::new();
+    let mut filter_errors = HashMap::new();
+    let mut point_results = HashMap::new();
+
+    run_runconfig(
+        &RunConfig::new(args.clone(), RunArgs::default(), filter, point_filters),
+        &mut filter_results,
+        &mut filter_errors,
+        &mut point_results,
+    )
+    .expect("Could not create run_config");
+
+    let run_results = RunResults {
+        prepend: args.prepend.clone(),
+        filter_results,
+        errors: filter_errors,
+        point_results,
+    };
+
+    Some(
+        serde_json::from_str(
+            &generate_result_json_str(run_results).expect("Error generating json result"),
+        )
+        .unwrap(),
+    )
 }
 
 fn parsing_common(testcase: Testcase) {
@@ -64,31 +142,7 @@ fn parsing_common(testcase: Testcase) {
         },
     ];
 
-    let args = Args::test_default(input);
-
-    let mut filter_results = HashMap::new();
-    let mut filter_errors = HashMap::new();
-    let mut point_results = HashMap::new();
-
-    run_runconfig(
-        &RunConfig::new(args.clone(), RunArgs::default(), filters, point_filters),
-        &mut filter_results,
-        &mut filter_errors,
-        &mut point_results,
-    )
-    .expect("Could not create run_config");
-
-    let run_results = RunResults {
-        prepend: args.prepend.clone(),
-        filter_results,
-        errors: filter_errors,
-        point_results,
-    };
-
-    let json_result: serde_json::Value = serde_json::from_str(
-        &generate_result_json_str(run_results).expect("Error generating json result"),
-    )
-    .expect("Could not parse json");
+    let json_result = test_filters(input, filters, point_filters).unwrap();
     let expectex_json_result: serde_json::Value =
         serde_json::from_str(output).expect("Could not parse json");
     assert_eq!(json_result, expectex_json_result);

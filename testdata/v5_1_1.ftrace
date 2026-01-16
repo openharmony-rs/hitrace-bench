@@ -66,3 +66,4 @@
            <...>-58089   (-------) [010] .... 510490.313901: tracing_mark_write: C|57783|H:servo_memory_profiling:hsts-list/private|0|M62
            <...>-58089   (-------) [010] .... 510490.313902: tracing_mark_write: C|57783|H:servo_memory_profiling:hsts-preload-list|2097152|M62
            <...>-58089   (-------) [010] .... 510490.313903: tracing_mark_write: C|57783|H:servo_memory_profiling:public-suffix-list|602536|M62
+           <...>-21748   (  19096) [001] .... 780497.926833: tracing_mark_write: C|21667|H:TESTCASE_PROFILING: generatehtml|1720|M62

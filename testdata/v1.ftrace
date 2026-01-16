@@ -9,7 +9,7 @@
  org.servo.servo-46512   (  46512) [010] .... 7230472.274412: tracing_mark_write: B|46512|H:on_surface_created_cb 
  org.servo.servo-46660   (  46512) [009] .... 7230473.141167: tracing_mark_write: B|46512|H:load status changed HeadParsed 
  org.servo.servo-46660   (  46512) [010] .... 7230474.245382: tracing_mark_write: B|46512|H:PageLoadEndedPrompt 
-
+           <...>-21748   (  19096) [001] .... 7280497.926833: tracing_mark_write: C|21667|H:TESTCASE_PROFILING: generatehtml 1720
  org.servo.servo-46888   (  46512) [010] .... 7230474.327149: tracing_mark_write: C|46512|H:servo_memory_profiling:system-fonts 28896
  org.servo.servo-46888   (  46512) [010] .... 7230474.327152: tracing_mark_write: C|46512|H:servo_memory_profiling:memory-cache/public 5343816
  org.servo.servo-46888   (  46512) [010] .... 7230474.327154: tracing_mark_write: C|46512|H:servo_memory_profiling:hsts-list/public 552

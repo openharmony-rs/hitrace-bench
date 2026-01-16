@@ -63,7 +63,12 @@ static SMAPS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static TESTCASE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^TESTCASE_PROFILING: (.*?) (\d+)$").expect("Could not parse regexp")
+    Regex::new(concat!(
+        r"^TESTCASE_PROFILING: (.*?) (\d+)$",
+        "|",
+        r"^TESTCASE_PROFILING: (.*?)\|(\d+)|\w*\d+$"
+    ))
+    .expect("Could not parse regexp")
 });
 
 #[derive(Debug)]
@@ -206,9 +211,13 @@ impl PointFilter {
         groups: Captures,
         trace: &'a Trace,
     ) -> Option<Point<'a>> {
-        let case_name = groups.get(1).expect("Could not find match").as_str();
-        let value = groups
-            .get(2)
+        let mut match_iter = groups.iter().flatten();
+        let _whole_match = match_iter.next();
+        let name = match_iter.next();
+
+        let case_name = name.expect("Could not find match").as_str();
+        let value = match_iter
+            .next()
             .expect("Could not find match")
             .as_str()
             .parse()
