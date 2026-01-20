@@ -35,7 +35,7 @@ static MEMORY_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
         r"^servo_memory_profiling:(.*?)\s(\d+)$",
         "|",
-        r"^servo_memory_profiling:(.*?)\|(\d+)\|\w*\d+$"
+        r"^servo_memory_profiling:(.*?)\|(\d+)\|\w*$"
     ))
     .expect("Could not parse regexp")
 });
@@ -46,7 +46,7 @@ static MEMORY_URL_REPORT_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
         r"^servo_memory_profiling:url\((.*?)\)\/(.*?)\s(\d+)$",
         "|",
-        r"^servo_memory_profiling:url\((.*?)\)\/(.*?)\|(\d+)\|\w*\d+$"
+        r"^servo_memory_profiling:url\((.*?)\)\/(.*?)\|(\d+)\|\w*$"
     ))
     .expect("Could not parse regexp")
 });
@@ -57,7 +57,7 @@ static SMAPS_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
         r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\s(\d+)$",
         "|",
-        r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\|(\d+)\|\w*\d+$"
+        r"^servo_memory_profiling:(resident-according-to-smaps)\/(.*)\|(\d+)\|\w*$"
     ))
     .expect("Could not parse regexp")
 });
@@ -66,7 +66,7 @@ static TESTCASE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
         r"^TESTCASE_PROFILING: (.*?) (\d+)$",
         "|",
-        r"^TESTCASE_PROFILING: (.*?)\|(\d+)|\w*\d+$"
+        r"^TESTCASE_PROFILING: (.*?)\|(\d+)|\w*$"
     ))
     .expect("Could not parse regexp")
 });
