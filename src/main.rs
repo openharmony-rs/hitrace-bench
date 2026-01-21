@@ -253,7 +253,7 @@ fn main() -> Result<()> {
                     name: String::from("resident-smaps"),
                     match_str: String::from("resident-according-to-smaps"),
                     no_unit_conversion: false,
-                    combined: false,
+                    combined: true,
                     point_filter_type: PointFilterType::Combined,
                 },
             ];
