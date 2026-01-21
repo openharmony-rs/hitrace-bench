@@ -13,9 +13,16 @@ use crate::{
 const SERVO_MEMORY_PROFILING_STRING: &str = "servo_memory_profiling";
 const SERVO_LCP_STRING: &str = "LargestContentfulPaint";
 
+#[derive(Debug, Eq, PartialEq, Clone, Copy, PartialOrd, Ord, serde::Deserialize)]
+pub(crate) enum PointFilterType {
+    Default,
+    Combined,
+    Largest,
+}
+
 /// We have different type of points which have different regexp.
 /// See the statics for a detailed explanation
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone, PartialOrd, Ord, serde::Deserialize)]
 pub(crate) enum PointType {
     /// A memory report that has an url attached, like LayoutThread.
     MemoryUrl(u64),
@@ -41,6 +48,12 @@ impl PointType {
             | PointType::Combined(v)
             | PointType::LargestContentfulPaint(v) => Some(*v),
         }
+    }
+}
+
+impl Default for PointFilterType {
+    fn default() -> Self {
+        PointFilterType::Default
     }
 }
 
@@ -116,9 +129,12 @@ pub(crate) struct PointFilter {
     /// Should we not assume this is in kb?
     #[serde(default)]
     pub(crate) no_unit_conversion: bool,
-    /// With this we combine all points that match a substring
+    /// With this we can combine all points that match a substring
     #[serde(default)]
     pub(crate) combined: bool,
+    /// This is more flexible version of "combined", but did not replace it fully due to input json
+    #[serde(default)]
+    pub(crate) point_filter_type: PointFilterType,
 }
 
 impl PointFilter {
@@ -128,7 +144,15 @@ impl PointFilter {
             match_str,
             no_unit_conversion: false,
             combined: false,
+            point_filter_type: PointFilterType::Default,
         }
+    }
+
+    pub(crate) fn finalize(mut self) -> Self {
+        if self.point_filter_type == PointFilterType::Default && self.combined {
+            self.point_filter_type = PointFilterType::Combined;
+        }
+        self
     }
 
     /// This filters sub memory reports with a url attached.
@@ -410,7 +434,7 @@ impl PointFilter {
             .flatten()
             .collect();
 
-        if self.combined {
+        if !matches!(self.point_filter_type, PointFilterType::Default) {
             // we now need to collect points with the same name
             points
                 .into_iter()
@@ -425,11 +449,19 @@ impl PointFilter {
                             // value: ,
                             no_unit_conversion: vals.first().unwrap().no_unit_conversion,
                             trace: None,
-                            point_type: PointType::Combined(
-                                vals.iter()
-                                    .map(|p| p.point_type.numeric_value().unwrap())
-                                    .sum(),
-                            ),
+                            point_type: match self.point_filter_type {
+                                PointFilterType::Largest => PointType::LargestContentfulPaint(
+                                    vals.iter()
+                                        .map(|p| p.point_type.numeric_value().unwrap())
+                                        .max()
+                                        .unwrap(),
+                                ),
+                                PointFilterType::Combined | _ => PointType::Combined(
+                                    vals.iter()
+                                        .map(|p| p.point_type.numeric_value().unwrap())
+                                        .sum(),
+                                ),
+                            },
                         }
                     }
                 })

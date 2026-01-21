@@ -124,5 +124,19 @@
       "lower_value": 167760.0,
       "upper_value": 167760.0
     }
+  },
+  "E2E/https://servo.org/LargestContentfulPaint/area": {
+    "Pixels": {
+      "value": 90810.0,
+      "lower_value": 90810.0,
+      "upper_value": 90810.0
+    }
+  },
+  "E2E/https://servo.org/LargestContentfulPaint/paint_time": {
+    "Nanoseconds": {
+      "value": 231277380060022.0,
+      "lower_value": 231277380060022.0,
+      "upper_value": 231277380060022.0
+    }
   }
 }

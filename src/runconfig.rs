@@ -94,7 +94,11 @@ pub(crate) fn into_run_config(args: Args, run_config_json: RunConfigJson) -> Run
             .into_iter()
             .map(|f| f.into())
             .collect(),
-        point_filters: run_config_json.point_filters,
+        point_filters: run_config_json
+            .point_filters
+            .into_iter()
+            .map(PointFilter::finalize)
+            .collect(),
     }
 }
 

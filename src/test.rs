@@ -1,8 +1,10 @@
 #![cfg(test)]
+use serde::Serialize;
 use serde_json::json;
 
 use crate::args::Args;
 use crate::bencher::generate_result_json_str;
+use crate::point_filters::PointFilterType;
 use crate::run_runconfig;
 use crate::utils::RunResults;
 use crate::{
@@ -38,20 +40,20 @@ fn parsing_v5() {
 
 #[test]
 fn parsing_v5_lcp() {
-    parsing_common_with_extra_filters(Testcase {
-        input_file_path: PathBuf::from("testdata/v5_1_1_LCP.ftrace"),
-        output_file_str: include_str!("../testdata/v5_1_1_LCP_output.json"),
-    },
-    vec![],
-    vec![
-        // PointFilter {
-        //     name: String::from("LargestContentfulPaint"),
-        //     match_str: String::from("LargestContentfulPaint"),
-        //     no_unit_conversion: true,
-        //     combined: false,
-        // }
-    ]
-);
+    parsing_common_with_extra_filters(
+        Testcase {
+            input_file_path: PathBuf::from("testdata/v5_1_1.ftrace"),
+            output_file_str: include_str!("../testdata/v5_1_1_LCP_output.json"),
+        },
+        vec![],
+        vec![PointFilter {
+            name: String::from("LargestContentfulPaint"),
+            match_str: String::from("LargestContentfulPaint"),
+            no_unit_conversion: true,
+            combined: false,
+            point_filter_type: PointFilterType::Largest,
+        }],
+    );
 }
 
 #[test]
@@ -61,6 +63,7 @@ fn test_testcase_regex() {
         match_str: String::from("generatehtml"),
         no_unit_conversion: true,
         combined: false,
+        point_filter_type: PointFilterType::Default,
     }];
 
     let expected_json = json!({
@@ -100,6 +103,7 @@ fn test_testcase_lcp() {
         match_str: String::from("LargestContentfulPaint"),
         no_unit_conversion: true,
         combined: false,
+        point_filter_type: PointFilterType::Largest,
     }];
 
     let expected_json = json!({
@@ -112,9 +116,9 @@ fn test_testcase_lcp() {
         },
         "E2E/https://servo.org/LargestContentfulPaint/paint_time": {
             "Nanoseconds": {
-            "value": 219733332872200.0,
-            "lower_value": 219733332872200.0,
-            "upper_value": 219733332872200.0
+            "value": 231277380060022.0,
+            "lower_value": 231277380060022.0,
+            "upper_value": 231277380060022.0
             }
         }
     });
@@ -188,6 +192,7 @@ fn parsing_common_with_extra_filters(
             match_str: String::from("explicit"),
             no_unit_conversion: false,
             combined: false,
+            point_filter_type: PointFilterType::Default,
         },
         PointFilter::new(String::from("Resident"), String::from("resident")),
         PointFilter::new(String::from("LayoutThread"), String::from("layout-thread")),
@@ -198,6 +203,7 @@ fn parsing_common_with_extra_filters(
             match_str: String::from("resident-according-to-smaps"),
             no_unit_conversion: false,
             combined: true,
+            point_filter_type: PointFilterType::Combined,
         },
     ];
 

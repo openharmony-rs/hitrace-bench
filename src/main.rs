@@ -11,7 +11,11 @@ use trace::Trace;
 use utils::{FilterErrors, FilterResults, PointResults, RunResults, avg_min_max};
 use yansi::{Condition, Paint};
 
-use crate::{args::RunArgs, point_filters::PointFilter, utils::PointResult};
+use crate::{
+    args::RunArgs,
+    point_filters::{PointFilter, PointFilterType},
+    utils::PointResult,
+};
 
 mod args;
 mod bencher;
@@ -239,6 +243,7 @@ fn main() -> Result<()> {
                     match_str: String::from("explicit"),
                     no_unit_conversion: false,
                     combined: false,
+                    point_filter_type: PointFilterType::Default,
                 },
                 PointFilter::new(String::from("Resident"), String::from("resident")),
                 PointFilter::new(String::from("LayoutThread"), String::from("layout-thread")),
@@ -248,7 +253,8 @@ fn main() -> Result<()> {
                     name: String::from("resident-smaps"),
                     match_str: String::from("resident-according-to-smaps"),
                     no_unit_conversion: false,
-                    combined: true,
+                    combined: false,
+                    point_filter_type: PointFilterType::Combined,
                 },
             ];
 
