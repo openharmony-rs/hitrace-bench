@@ -90,7 +90,7 @@ static TESTCASE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
         r"^TESTCASE_PROFILING: (.*?) (\d+)$",
         "|",
-        r"^TESTCASE_PROFILING: (.*?)\|(\d+)\|\w*\d+$"
+        r"^TESTCASE_PROFILING: (.*?)\|(\d+)\|\w*$"
     ))
     .expect("Could not parse regexp")
 });
@@ -250,6 +250,7 @@ impl PointFilter {
         groups: Captures,
         trace: &'a Trace,
     ) -> Option<Vec<Point<'a>>> {
+        println!(">>> {:?}", groups);
         let mut match_iter = groups.iter().flatten();
         let _whole_match = match_iter.next();
         let name = match_iter.next();
