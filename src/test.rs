@@ -1,5 +1,4 @@
 #![cfg(test)]
-use serde::Serialize;
 use serde_json::json;
 
 use crate::args::Args;
@@ -209,10 +208,7 @@ fn parsing_common_with_extra_filters(
 
     let json_result = test_filters(
         input,
-        filters
-            .into_iter()
-            .chain(extra_filter.into_iter())
-            .collect(),
+        filters.into_iter().chain(extra_filter).collect(),
         point_filters
             .into_iter()
             .chain(extra_point_filters)

@@ -13,8 +13,9 @@ use crate::{
 const SERVO_MEMORY_PROFILING_STRING: &str = "servo_memory_profiling";
 const SERVO_LCP_STRING: &str = "LargestContentfulPaint";
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, PartialOrd, Ord, serde::Deserialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, PartialOrd, Ord, serde::Deserialize, Default)]
 pub(crate) enum PointFilterType {
+    #[default]
     Default,
     Combined,
     Largest,
@@ -48,12 +49,6 @@ impl PointType {
             | PointType::Combined(v)
             | PointType::LargestContentfulPaint(v) => Some(*v),
         }
-    }
-}
-
-impl Default for PointFilterType {
-    fn default() -> Self {
-        PointFilterType::Default
     }
 }
 
@@ -330,9 +325,7 @@ impl PointFilter {
         input
             .split(',')
             .filter_map(|pair| {
-                let mut it = pair.splitn(2, '=');
-                let key = it.next()?;
-                let value = it.next()?;
+                let (key, value) = pair.split_once('=')?;
                 Some((key.to_string(), value.to_string()))
             })
             .collect()
@@ -446,9 +439,11 @@ impl PointFilter {
                     } else {
                         Point {
                             name,
-                            // value: ,
                             no_unit_conversion: vals.first().unwrap().no_unit_conversion,
                             trace: None,
+                            // Unreachable by PointFilterType::Default and exhausted
+                            // wildcard_in_or_pattern to Explicitly show that there is no Defaults
+                            #[allow(clippy::wildcard_in_or_patterns)]
                             point_type: match self.point_filter_type {
                                 PointFilterType::Largest => PointType::LargestContentfulPaint(
                                     vals.iter()
@@ -456,6 +451,7 @@ impl PointFilter {
                                         .max()
                                         .unwrap(),
                                 ),
+
                                 PointFilterType::Combined | _ => PointType::Combined(
                                     vals.iter()
                                         .map(|p| p.point_type.numeric_value().unwrap())
