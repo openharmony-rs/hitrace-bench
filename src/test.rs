@@ -10,6 +10,7 @@ use crate::{
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::vec;
 
 const V1_INPUT_PATH_STR: &str = "testdata/v1.ftrace";
 const V5_INPUT_PATH_STR: &str = "testdata/v5_1_1.ftrace";
@@ -33,6 +34,24 @@ fn parsing_v5() {
         input_file_path: PathBuf::from("testdata/v5_1_1.ftrace"),
         output_file_str: include_str!("../testdata/v5_1_1_output.json"),
     });
+}
+
+#[test]
+fn parsing_v5_lcp() {
+    parsing_common_with_extra_filters(Testcase {
+        input_file_path: PathBuf::from("testdata/v5_1_1_LCP.ftrace"),
+        output_file_str: include_str!("../testdata/v5_1_1_LCP_output.json"),
+    },
+    vec![],
+    vec![
+        // PointFilter {
+        //     name: String::from("LargestContentfulPaint"),
+        //     match_str: String::from("LargestContentfulPaint"),
+        //     no_unit_conversion: true,
+        //     combined: false,
+        // }
+    ]
+);
 }
 
 #[test]
@@ -74,6 +93,38 @@ fn test_testcase_regex() {
     );
 }
 
+#[test]
+fn test_testcase_lcp() {
+    let point_filters = vec![PointFilter {
+        name: String::from("LargestContentfulPaint"),
+        match_str: String::from("LargestContentfulPaint"),
+        no_unit_conversion: true,
+        combined: false,
+    }];
+
+    let expected_json = json!({
+        "E2E/https://servo.org/LargestContentfulPaint/area": {
+            "Pixels": {
+            "value": 90810.0,
+            "lower_value": 90810.0,
+            "upper_value": 90810.0
+            }
+        },
+        "E2E/https://servo.org/LargestContentfulPaint/paint_time": {
+            "Nanoseconds": {
+            "value": 219733332872200.0,
+            "lower_value": 219733332872200.0,
+            "upper_value": 219733332872200.0
+            }
+        }
+    });
+
+    assert_eq!(
+        test_filters(PathBuf::from(V5_INPUT_PATH_STR), vec![], point_filters).unwrap(),
+        expected_json
+    );
+}
+
 fn test_filters(
     input_file: PathBuf,
     filter: Vec<Filter>,
@@ -109,6 +160,14 @@ fn test_filters(
 }
 
 fn parsing_common(testcase: Testcase) {
+    parsing_common_with_extra_filters(testcase, vec![], vec![]);
+}
+
+fn parsing_common_with_extra_filters(
+    testcase: Testcase,
+    extra_filter: Vec<Filter>,
+    extra_point_filters: Vec<PointFilter>,
+) {
     let (input, output) = (testcase.input_file_path, testcase.output_file_str);
 
     let filters = vec![
@@ -142,7 +201,18 @@ fn parsing_common(testcase: Testcase) {
         },
     ];
 
-    let json_result = test_filters(input, filters, point_filters).unwrap();
+    let json_result = test_filters(
+        input,
+        filters
+            .into_iter()
+            .chain(extra_filter.into_iter())
+            .collect(),
+        point_filters
+            .into_iter()
+            .chain(extra_point_filters)
+            .collect(),
+    )
+    .unwrap();
     let expectex_json_result: serde_json::Value =
         serde_json::from_str(output).expect("Could not parse json");
     assert_eq!(json_result, expectex_json_result);

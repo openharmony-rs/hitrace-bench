@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::{collections::HashMap, sync::LazyLock};
 
 use itertools::Itertools;
 use log::error;
@@ -11,21 +11,37 @@ use crate::{
 };
 
 const SERVO_MEMORY_PROFILING_STRING: &str = "servo_memory_profiling";
+const SERVO_LCP_STRING: &str = "LargestContentfulPaint";
 
 /// We have different type of points which have different regexp.
 /// See the statics for a detailed explanation
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum PointType {
     /// A memory report that has an url attached, like LayoutThread.
-    MemoryUrl,
+    MemoryUrl(u64),
     /// A simple memory report, corresponding to resident-memory most likely.
-    MemoryReport,
+    MemoryReport(u64),
     /// Report of smaps.
-    Smaps,
+    Smaps(u64),
     /// Report of a testcase point.
-    Testcase,
+    Testcase(u64),
     /// Something we will combine.
-    Combined,
+    Combined(u64),
+    /// LCP
+    LargestContentfulPaint(u64),
+}
+
+impl PointType {
+    pub fn numeric_value(&self) -> Option<u64> {
+        match self {
+            PointType::MemoryUrl(v)
+            | PointType::MemoryReport(v)
+            | PointType::Smaps(v)
+            | PointType::Testcase(v)
+            | PointType::Combined(v)
+            | PointType::LargestContentfulPaint(v) => Some(*v),
+        }
+    }
 }
 
 /// Notice that this also matches MEMORY_URL_REPORT
@@ -66,9 +82,13 @@ static TESTCASE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
         r"^TESTCASE_PROFILING: (.*?) (\d+)$",
         "|",
-        r"^TESTCASE_PROFILING: (.*?)\|(\d+)|\w*$"
+        r"^TESTCASE_PROFILING: (.*?)\|(\d+)\|\w*\d+$"
     ))
     .expect("Could not parse regexp")
+});
+
+static LCP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(LargestContentfulPaint)\|\w*\|(.*?)$").expect("Could not parse regexp")
 });
 
 #[derive(Debug)]
@@ -76,8 +96,8 @@ static TESTCASE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 pub(crate) struct Point<'a> {
     /// The name you gave to this point
     pub(crate) name: String,
-    /// The value of the point
-    pub(crate) value: u64,
+    // /// The value of the point
+    // pub(crate) value: u64,
     /// Do not convert units
     pub(crate) no_unit_conversion: bool,
     /// The type of point this matches to
@@ -117,7 +137,7 @@ impl PointFilter {
         run_config: &RunConfig,
         groups: Captures,
         trace: &'a Trace,
-    ) -> Option<Point<'a>> {
+    ) -> Option<Vec<Point<'a>>> {
         let mut match_iter = groups.iter().flatten();
         let _whole_match = match_iter.next();
         let url = match_iter.next().expect("No match").as_str();
@@ -133,16 +153,16 @@ impl PointFilter {
             if !suffix.is_empty() {
                 suffix.insert(0, '/');
             }
-            Some(Point {
+            Some(vec![Point {
                 name: run_config.run_args.url.to_owned()
                     + "/"
                     + self.name.as_str()
                     + suffix.as_str(),
-                value,
+                // value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
-                point_type: PointType::MemoryUrl,
-            })
+                point_type: PointType::MemoryUrl(value),
+            }])
         } else {
             None
         }
@@ -154,7 +174,7 @@ impl PointFilter {
         run_config: &RunConfig,
         groups: Captures,
         trace: &'a Trace,
-    ) -> Option<Point<'a>> {
+    ) -> Option<Vec<Point<'a>>> {
         let mut match_iter = groups.iter().flatten();
         let _whole_match = match_iter.next();
         let match_str = match_iter.next().unwrap().as_str();
@@ -168,13 +188,13 @@ impl PointFilter {
                 .as_str()
                 .parse()
                 .expect("Could not parse");
-            Some(Point {
+            Some(vec![Point {
                 name: run_config.run_args.url.to_owned() + "/" + self.name.as_str(),
-                value,
+                // value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
-                point_type: PointType::Smaps,
-            })
+                point_type: PointType::Smaps(value),
+            }])
         }
     }
 
@@ -184,7 +204,7 @@ impl PointFilter {
         run_config: &RunConfig,
         groups: Captures,
         trace: &'a Trace,
-    ) -> Option<Point<'a>> {
+    ) -> Option<Vec<Point<'a>>> {
         let mut match_iter = groups.iter().flatten();
         let _whole_match = match_iter.next();
         let _name = match_iter.next();
@@ -195,13 +215,13 @@ impl PointFilter {
             .as_str()
             .parse()
             .expect("Could not parse value");
-        Some(Point {
+        Some(vec![Point {
             name: run_config.run_args.url.to_owned() + "/" + self.name.as_str(),
-            value,
+            // value,
             no_unit_conversion: self.no_unit_conversion,
             trace: Some(trace),
-            point_type: PointType::MemoryReport,
-        })
+            point_type: PointType::MemoryReport(value),
+        }])
     }
 
     /// This filters test cases
@@ -210,7 +230,7 @@ impl PointFilter {
         run_config: &RunConfig,
         groups: Captures,
         trace: &'a Trace,
-    ) -> Option<Point<'a>> {
+    ) -> Option<Vec<Point<'a>>> {
         let mut match_iter = groups.iter().flatten();
         let _whole_match = match_iter.next();
         let name = match_iter.next();
@@ -223,16 +243,91 @@ impl PointFilter {
             .parse()
             .expect("Could not parse value");
         if case_name.contains(&self.match_str) {
-            Some(Point {
+            Some(vec![Point {
                 name: run_config.run_args.url.to_owned() + "/",
-                value,
+                // value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
-                point_type: PointType::Testcase,
-            })
+                point_type: PointType::Testcase(value),
+            }])
         } else {
             None
         }
+    }
+
+    /// This filters LCP cases
+    fn filter_lcp<'a>(
+        &'a self,
+        run_config: &RunConfig,
+        groups: Captures,
+        trace: &'a Trace,
+    ) -> Option<Vec<Point<'a>>> {
+        let mut match_iter = groups.iter().flatten();
+        let _whole_match = match_iter.next();
+        let filter_name = match_iter.next().expect("Could not find match").as_str();
+        let key_values = match_iter.next().expect("Could not find match").as_str();
+        let kv_hashmap = Self::trace_kv_str_to_hashmap(key_values.to_string());
+
+        if filter_name == SERVO_LCP_STRING {
+            Some(vec![
+                Point {
+                    name: run_config.run_args.url.to_owned()
+                        + "/"
+                        + self.name.as_str()
+                        + "/paint_time",
+                    no_unit_conversion: self.no_unit_conversion,
+                    trace: Some(trace),
+                    point_type: PointType::LargestContentfulPaint(Self::trace_special_case_parser(
+                        kv_hashmap
+                            .get("paint_time")
+                            .expect("[paint_time] field was not found in the LCP trace")
+                            .to_string(),
+                    )?),
+                },
+                Point {
+                    name: run_config.run_args.url.to_owned() + "/" + self.name.as_str() + "/area",
+                    no_unit_conversion: self.no_unit_conversion,
+                    trace: Some(trace),
+                    point_type: PointType::LargestContentfulPaint(
+                        kv_hashmap
+                            .get("area")
+                            .expect("Area field was not found in the LCP trace")
+                            .parse::<u64>()
+                            .expect("Could not parse area in LCP"),
+                    ),
+                },
+            ])
+        } else {
+            None
+        }
+    }
+
+    fn trace_kv_str_to_hashmap(input: String) -> HashMap<String, String> {
+        input
+            .split(',')
+            .filter_map(|pair| {
+                let mut it = pair.splitn(2, '=');
+                let key = it.next()?;
+                let value = it.next()?;
+                Some((key.to_string(), value.to_string()))
+            })
+            .collect()
+    }
+
+    /// This function is only here because in servo/servo CrossProcessInstant does not export value
+    fn trace_special_case_parser(value: String) -> Option<u64> {
+        if let Ok(v) = value.parse::<u64>() {
+            return Some(v);
+        }
+
+        // Handle: CrossProcessInstant { value: 219733332872200 }
+        const PREFIX: &str = "CrossProcessInstant { value: ";
+        const SUFFIX: &str = " }";
+
+        value
+            .strip_prefix(PREFIX)
+            .and_then(|v| v.strip_suffix(SUFFIX))
+            .and_then(|v| v.parse::<u64>().ok())
     }
 
     /// This is the main filter function which will call the corresponding filter functions
@@ -240,7 +335,7 @@ impl PointFilter {
         &'a self,
         trace: &'a Trace,
         run_config: &RunConfig,
-    ) -> Option<Point<'a>> {
+    ) -> Option<Vec<Point<'a>>> {
         if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
             self.filter_memory_url(run_config, groups, trace)
         } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
@@ -249,6 +344,8 @@ impl PointFilter {
             self.filter_memory(run_config, groups, trace)
         } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
             self.filter_testcase(run_config, groups, trace)
+        } else if let Some(groups) = LCP_REGEX.captures(&trace.function) {
+            self.filter_lcp(run_config, groups, trace)
         } else {
             None
         }
@@ -259,7 +356,7 @@ impl PointFilter {
     fn remove_duplicates(&self, points: &mut Vec<Point>) {
         if points
             .iter()
-            .filter(|p| p.point_type == PointType::Testcase)
+            .filter(|p| matches!(p.point_type, PointType::Testcase(_)))
             .count()
             > 1
         {
@@ -271,12 +368,12 @@ impl PointFilter {
                     .filter_map(|p| p.trace)
                     .collect::<Vec<&Trace>>()
             );
-            points.retain(|p| p.point_type != PointType::Testcase);
+            points.retain(|p| !matches!(p.point_type, PointType::Testcase(_)));
         }
 
         if points
             .iter()
-            .filter(|p| p.point_type == PointType::MemoryReport)
+            .filter(|p| matches!(p.point_type, PointType::MemoryReport(_)))
             .count()
             > 1
         {
@@ -288,7 +385,7 @@ impl PointFilter {
                     .filter_map(|p| p.trace)
                     .collect::<Vec<&Trace>>()
             );
-            points.retain(|p| p.point_type != PointType::MemoryReport);
+            points.retain(|p| !matches!(p.point_type, PointType::MemoryReport(_)));
         }
     }
 
@@ -300,13 +397,17 @@ impl PointFilter {
     ) -> Vec<Point<'a>> {
         let mut points: Vec<_> = traces
             .iter()
-            .filter(|t| t.trace_marker == TraceMarker::Dot)
+            .filter(|t| {
+                t.trace_marker == TraceMarker::Dot || t.trace_marker == TraceMarker::StartSync
+            })
             .filter(|t| {
                 t.function.contains(SERVO_MEMORY_PROFILING_STRING)
                     || t.function.contains("TESTCASE_PROFILING")
+                    || t.function.contains(SERVO_LCP_STRING)
             })
             .filter(|t| t.function.contains(&self.match_str))
             .filter_map(|t| self.filter_trace_to_option_point(t, run_config))
+            .flatten()
             .collect();
 
         if self.combined {
@@ -321,10 +422,14 @@ impl PointFilter {
                     } else {
                         Point {
                             name,
-                            value: vals.iter().map(|p| p.value).sum(),
+                            // value: ,
                             no_unit_conversion: vals.first().unwrap().no_unit_conversion,
                             trace: None,
-                            point_type: PointType::Combined,
+                            point_type: PointType::Combined(
+                                vals.iter()
+                                    .map(|p| p.point_type.numeric_value().unwrap())
+                                    .sum(),
+                            ),
                         }
                     }
                 })

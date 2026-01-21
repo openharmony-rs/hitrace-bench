@@ -126,10 +126,10 @@ fn run_runconfig_points(run_config: &RunConfig, traces: &[Trace], points: &mut P
         let key = p.name.to_owned();
         points
             .entry(key)
-            .and_modify(|v| v.result.push(p.value))
+            .and_modify(|v| v.result.push(p.point_type.numeric_value().unwrap()))
             .or_insert(PointResult {
                 no_unit_conversion: p.no_unit_conversion,
-                result: vec![p.value],
+                result: vec![p.point_type.numeric_value().unwrap()],
             });
     }
 }
