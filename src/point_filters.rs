@@ -282,8 +282,7 @@ impl PointFilter {
                     point_type: PointType::LargestContentfulPaint(trace_special_case_parser(
                         kv_hashmap
                             .get("paint_time")
-                            .expect("[paint_time] field was not found in the LCP trace")
-                            .to_string(),
+                            .expect("[paint_time] field was not found in the LCP trace"),
                     )?),
                 },
                 Point {
@@ -467,19 +466,16 @@ fn trace_kv_str_to_hashmap(input: &str) -> HashMap<String, String> {
 }
 
 /// This function is only here because in servo/servo CrossProcessInstant does not export value
-fn trace_special_case_parser(value: String) -> Option<u64> {
+fn trace_special_case_parser(value: &str) -> Option<u64> {
     if let Ok(v) = value.parse::<u64>() {
         return Some(v);
     }
 
     // Handle: CrossProcessInstant { value: 219733332872200 }
-    const PREFIX: &str = "CrossProcessInstant { value: ";
-    const SUFFIX: &str = " }";
-
-    value
-        .strip_prefix(PREFIX)
-        .and_then(|v| v.strip_suffix(SUFFIX))
-        .and_then(|v| v.parse::<u64>().ok())
+    let re = Regex::new(r"^CrossProcessInstant\s*\{\s*value:\s*(\d+)\s*\}$").unwrap();
+    re.captures(value)
+        .and_then(|caps| caps.get(1))
+        .and_then(|m| m.as_str().parse::<u64>().ok())
 }
 
 #[test]
@@ -503,7 +499,7 @@ fn test_trace_kv_parsing() {
         .collect::<HashMap<String, String>>()
     );
 
-    let test_case1_str = "CrossProcessInstant { value: 219733332872200 }".to_string();
+    let test_case1_str = "CrossProcessInstant { value: 219733332872200 }";
     assert_eq!(
         trace_special_case_parser(test_case1_str),
         Some(219733332872200)
