@@ -48,7 +48,7 @@
             {
                 "name": "resident-smaps",
                 "match_str": "resident-according-to-smaps",
-                "combined": true,
+                "point_filter_type": "Combined"
             }
         ]
     },
@@ -88,7 +88,7 @@
             {
                 "name": "resident-smaps",
                 "match_str": "resident-according-to-smaps",
-                "combined": true
+                "point_filter_type": "Combined"
             }
         ]
     },

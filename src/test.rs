@@ -2,20 +2,22 @@
 use serde_json::json;
 
 use crate::args::Args;
-use crate::bencher::generate_result_json_str;
+use crate::bencher::{self, generate_result_json_str};
 use crate::point_filters::PointFilterType;
-use crate::run_runconfig;
 use crate::utils::RunResults;
 use crate::{
     args::RunArgs, filter::Filter, point_filters::PointFilter, runconfig::RunConfig, trace::Trace,
 };
+use crate::{run_runconfig, runconfig};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 use std::vec;
 
-const V1_INPUT_PATH_STR: &str = "testdata/v1.ftrace";
-const V5_INPUT_PATH_STR: &str = "testdata/v5_1_1.ftrace";
-const V5_LCP_INPUT_PATH_STR: &str = "testdata/v5_1_1_LCP.ftrace";
+const V1_INPUT_PATH: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("testdata/v1.ftrace"));
+const V5_INPUT_PATH: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("testdata/v5_1_1.ftrace"));
+const V5_LCP_INPUT_PATH: LazyLock<PathBuf> =
+    LazyLock::new(|| PathBuf::from("testdata/v5_1_1_LCP.ftrace"));
 
 const V1_OUTPUT: &str = include_str!("../testdata/v1_output.json");
 const V5_OUTPUT: &str = include_str!("../testdata/v5_1_1_output.json");
@@ -29,7 +31,7 @@ struct Testcase<'a> {
 #[test]
 fn full_default_v1() {
     parsing_common(Testcase {
-        input_file_path: PathBuf::from(V1_INPUT_PATH_STR),
+        input_file_path: V1_INPUT_PATH.to_path_buf(),
         output_file_str: V1_OUTPUT,
     });
 }
@@ -37,7 +39,7 @@ fn full_default_v1() {
 #[test]
 fn full_default_v5() {
     parsing_common(Testcase {
-        input_file_path: PathBuf::from(V5_INPUT_PATH_STR),
+        input_file_path: V5_INPUT_PATH.to_path_buf(),
         output_file_str: V5_OUTPUT,
     });
 }
@@ -46,7 +48,7 @@ fn full_default_v5() {
 fn full_v5_with_lcp() {
     parsing_common_with_extra_filters(
         Testcase {
-            input_file_path: PathBuf::from(V5_LCP_INPUT_PATH_STR),
+            input_file_path: V5_LCP_INPUT_PATH.to_path_buf(),
             output_file_str: V5_LCP_OUTPUT,
         },
         vec![],
@@ -81,21 +83,11 @@ fn test_testcaseprofiling_v1_v5() {
     });
 
     assert_eq!(
-        test_filters(
-            PathBuf::from(V1_INPUT_PATH_STR),
-            vec![],
-            point_filters.clone()
-        )
-        .unwrap(),
+        test_filters(V1_INPUT_PATH.to_path_buf(), vec![], point_filters.clone()).unwrap(),
         expected_json
     );
     assert_eq!(
-        test_filters(
-            PathBuf::from(V5_INPUT_PATH_STR),
-            vec![],
-            point_filters.clone()
-        )
-        .unwrap(),
+        test_filters(V5_INPUT_PATH.to_path_buf(), vec![], point_filters.clone()).unwrap(),
         expected_json
     );
 }
@@ -128,7 +120,7 @@ fn test_lcp_v5() {
     });
 
     assert_eq!(
-        test_filters(PathBuf::from(V5_LCP_INPUT_PATH_STR), vec![], point_filters).unwrap(),
+        test_filters(V5_LCP_INPUT_PATH.to_path_buf(), vec![], point_filters).unwrap(),
         expected_json
     );
 }
@@ -223,4 +215,52 @@ fn parsing_common_with_extra_filters(
     let expectex_json_result: serde_json::Value =
         serde_json::from_str(output).expect("Could not parse json");
     assert_eq!(json_result, expectex_json_result);
+}
+
+#[test]
+fn test_run_with_old_json() {
+    let runs_output = include_str!("../testdata/runs_output.json");
+    let args = Args::test_default(V5_LCP_INPUT_PATH.to_path_buf());
+    let run_configs = runconfig::read_run_file(&PathBuf::from("runs.json"), &args).unwrap();
+
+    let all_bencher = run_configs.iter().all(|r| r.args.bencher);
+    let all_print = run_configs.iter().all(|r| !r.args.bencher);
+    if !all_bencher && !all_print {
+        panic!("We only support all bencher or all print runs");
+    }
+    let be_loud_filter = if args.quiet || all_bencher {
+        log::LevelFilter::Error
+    } else {
+        log::LevelFilter::Info
+    };
+
+    env_logger::builder().filter_level(be_loud_filter).init();
+
+    let mut filter_results = HashMap::new();
+    let mut filter_errors = HashMap::new();
+    let mut point_results = HashMap::new();
+    for run_config in run_configs {
+        run_runconfig(
+            &run_config,
+            &mut filter_results,
+            &mut filter_errors,
+            &mut point_results,
+        )
+        .unwrap();
+    }
+
+    let result = bencher::generate_result_json_str(RunResults {
+        prepend: args.prepend.clone(),
+        filter_results,
+        errors: filter_errors,
+        point_results,
+    })
+    .unwrap();
+
+    // panic!("{:?}", result);
+
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&result).unwrap(),
+        serde_json::from_str::<serde_json::Value>(runs_output).expect("Could not parse json")
+    )
 }
