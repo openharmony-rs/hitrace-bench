@@ -13,7 +13,7 @@ use crate::{
 const SERVO_MEMORY_PROFILING_STRING: &str = "servo_memory_profiling";
 const SERVO_LCP_STRING: &str = "LargestContentfulPaint";
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, PartialOrd, Ord, serde::Deserialize, Default)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, PartialOrd, Ord, Deserialize, Default)]
 pub(crate) enum PointFilterType {
     #[default]
     Default,
