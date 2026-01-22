@@ -6,9 +6,9 @@
 #                                        ||| /     delay
 #           TASK-PID       TGID    CPU#  ||||   TIMESTAMP  FUNCTION
 #              | |           |       |   ||||      |         |
-           <...>-57783   (-------) [010] .... 510487.404088: tracing_mark_write: B|57783|H:on_surface_created_cb|M62
-           <...>-57910   (-------) [008] .... 510488.157428: tracing_mark_write: B|57783|H:load status changed HeadParsed|M62
-           <...>-57910   (-------) [010] .... 510490.232042: tracing_mark_write: B|57783|H:PageLoadEndedPrompt|M62
+ org.servo.servo-46512   (  46512) [010] .... 7230472.274412: tracing_mark_write: B|46512|H:on_surface_created_cb 
+ org.servo.servo-46660   (  46512) [009] .... 7230473.141167: tracing_mark_write: B|46512|H:load status changed HeadParsed 
+ org.servo.servo-46660   (  46512) [010] .... 7230474.245382: tracing_mark_write: B|46512|H:PageLoadEndedPrompt 
            <...>-58089   (-------) [010] .... 510490.313831: tracing_mark_write: C|57783|H:servo_memory_profiling:vsize|45766221824|M62
            <...>-58089   (-------) [010] .... 510490.313834: tracing_mark_write: C|57783|H:servo_memory_profiling:resident|403623936|M62
            <...>-58089   (-------) [010] .... 510490.313836: tracing_mark_write: C|57783|H:servo_memory_profiling:pss|282854|M62
@@ -67,3 +67,6 @@
            <...>-58089   (-------) [010] .... 510490.313902: tracing_mark_write: C|57783|H:servo_memory_profiling:hsts-preload-list|2097152|M62
            <...>-58089   (-------) [010] .... 510490.313903: tracing_mark_write: C|57783|H:servo_memory_profiling:public-suffix-list|602536|M62
            <...>-21748   (  19096) [001] .... 780497.926833: tracing_mark_write: C|21667|H:TESTCASE_PROFILING: generatehtml|1720|M62
+   OS_FFRT_Delay-46206   (   1593) [004] .... 1125285.368514: tracing_mark_write: B|46127|H:LargestContentfulPaint|I62|paint_time=CrossProcessInstant { value: 231277222481376 },area=4095,lcp_type=Image,pipeline_id=(1,1)
+   OS_FFRT_Delay-46206   (   1593) [004] .... 1125285.462219: tracing_mark_write: B|46127|H:LargestContentfulPaint|I62|paint_time=CrossProcessInstant { value: 231277316212626 },area=27064,lcp_type=Image,pipeline_id=(1,1)
+   OS_FFRT_Delay-46206   (   1593) [008] .... 1125285.526068: tracing_mark_write: B|46127|H:LargestContentfulPaint|I62|paint_time=CrossProcessInstant { value: 231277380060022 },area=90810,lcp_type=Image,pipeline_id=(1,1)

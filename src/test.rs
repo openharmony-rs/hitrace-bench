@@ -15,6 +15,12 @@ use std::vec;
 
 const V1_INPUT_PATH_STR: &str = "testdata/v1.ftrace";
 const V5_INPUT_PATH_STR: &str = "testdata/v5_1_1.ftrace";
+const V5_LCP_INPUT_PATH_STR: &str = "testdata/v5_1_1_LCP.ftrace";
+
+const V1_OUTPUT: &str = include_str!("../testdata/v1_output.json");
+const V5_OUTPUT: &str = include_str!("../testdata/v5_1_1_output.json");
+const V5_LCP_OUTPUT: &str = include_str!("../testdata/v5_1_1_LCP_output.json");
+
 
 struct Testcase<'a> {
     input_file_path: PathBuf,
@@ -22,27 +28,27 @@ struct Testcase<'a> {
 }
 
 #[test]
-fn parsing_v1() {
+fn full_default_v1() {
     parsing_common(Testcase {
-        input_file_path: PathBuf::from("testdata/v1.ftrace"),
-        output_file_str: include_str!("../testdata/v1_output.json"),
+        input_file_path: PathBuf::from(V1_INPUT_PATH_STR),
+        output_file_str: V1_OUTPUT,
     });
 }
 
 #[test]
-fn parsing_v5() {
+fn full_default_v5() {
     parsing_common(Testcase {
-        input_file_path: PathBuf::from("testdata/v5_1_1.ftrace"),
-        output_file_str: include_str!("../testdata/v5_1_1_output.json"),
+        input_file_path: PathBuf::from(V5_INPUT_PATH_STR),
+        output_file_str: V5_OUTPUT,
     });
 }
 
 #[test]
-fn parsing_v5_lcp() {
+fn full_v5_with_lcp() {
     parsing_common_with_extra_filters(
         Testcase {
-            input_file_path: PathBuf::from("testdata/v5_1_1.ftrace"),
-            output_file_str: include_str!("../testdata/v5_1_1_LCP_output.json"),
+            input_file_path: PathBuf::from(V5_LCP_INPUT_PATH_STR),
+            output_file_str: V5_LCP_OUTPUT,
         },
         vec![],
         vec![PointFilter {
@@ -56,7 +62,7 @@ fn parsing_v5_lcp() {
 }
 
 #[test]
-fn test_testcase_regex() {
+fn test_testcaseprofiling_v1_v5() {
     let point_filters = vec![PointFilter {
         name: String::from("TESTCASE_PROFILING"),
         match_str: String::from("generatehtml"),
@@ -96,7 +102,7 @@ fn test_testcase_regex() {
 }
 
 #[test]
-fn test_testcase_lcp() {
+fn test_lcp_v5() {
     let point_filters = vec![PointFilter {
         name: String::from("LargestContentfulPaint"),
         match_str: String::from("LargestContentfulPaint"),
@@ -123,7 +129,7 @@ fn test_testcase_lcp() {
     });
 
     assert_eq!(
-        test_filters(PathBuf::from(V5_INPUT_PATH_STR), vec![], point_filters).unwrap(),
+        test_filters(PathBuf::from(V5_LCP_INPUT_PATH_STR), vec![], point_filters).unwrap(),
         expected_json
     );
 }
