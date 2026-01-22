@@ -21,7 +21,6 @@ const V1_OUTPUT: &str = include_str!("../testdata/v1_output.json");
 const V5_OUTPUT: &str = include_str!("../testdata/v5_1_1_output.json");
 const V5_LCP_OUTPUT: &str = include_str!("../testdata/v5_1_1_LCP_output.json");
 
-
 struct Testcase<'a> {
     input_file_path: PathBuf,
     output_file_str: &'a str,
