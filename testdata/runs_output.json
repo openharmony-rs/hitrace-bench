@@ -33,5 +33,33 @@
             "upper_value": 1970970000.0,
             "value": 1970970000.0
         }
+    },
+    "E2E/https://www.google.com/LargestContentfulPaint/area": {
+        "Pixels": {
+            "lower_value": 90810.0,
+            "upper_value": 90810.0,
+            "value": 90810.0
+        }
+    }, 
+    "E2E/https://www.google.com/LargestContentfulPaint/paint_time": {
+        "Nanoseconds": {
+            "lower_value": 231277380060022.0,
+            "upper_value": 231277380060022.0,
+            "value": 231277380060022.0
+        }
+    },
+    "E2E/https://www.servo.org/LargestContentfulPaint/area": {
+        "Pixels": {
+            "lower_value": 90810.0,
+            "upper_value": 90810.0,
+            "value": 90810.0
+        }
+    },
+    "E2E/https://www.servo.org/LargestContentfulPaint/paint_time": {
+        "Nanoseconds": {
+            "lower_value": 231277380060022.0,
+            "upper_value": 231277380060022.0,
+            "value": 231277380060022.0
+        }
     }
 }
