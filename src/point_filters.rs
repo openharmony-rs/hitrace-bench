@@ -99,6 +99,10 @@ static LCP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(LargestContentfulPaint)\|\w*\|(.*?)$").expect("Could not parse regexp")
 });
 
+static CROSS_PROCESS_INSTANT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^CrossProcessInstant\s*\{\s*value:\s*(\d+)\s*\}$").expect("Could not parse regexp")
+});
+
 /// A parsed trace point metric
 pub(crate) struct Point<'a> {
     /// The name you gave to this point
@@ -472,8 +476,8 @@ fn trace_special_case_parser(value: &str) -> Option<u64> {
     }
 
     // Handle: CrossProcessInstant { value: 219733332872200 }
-    let re = Regex::new(r"^CrossProcessInstant\s*\{\s*value:\s*(\d+)\s*\}$").unwrap();
-    re.captures(value)
+    CROSS_PROCESS_INSTANT
+        .captures(value)
         .and_then(|caps| caps.get(1))
         .and_then(|m| m.as_str().parse::<u64>().ok())
 }
