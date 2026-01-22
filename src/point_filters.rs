@@ -310,26 +310,26 @@ impl PointFilter {
         trace: &'a Trace,
         run_config: &RunConfig,
     ) -> Option<Vec<Point<'a>>> {
-        // For filters that return vector of points
         if let Some(groups) = LCP_REGEX.captures(&trace.function) {
-            return self.filter_lcp(run_config, groups, trace);
+            // For filters that return vector of points
+            self.filter_lcp(run_config, groups, trace)
+        } else {
+            // For filters that return single point
+            let single_point: Option<Point<'a>> =
+                if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
+                    self.filter_memory_url(run_config, groups, trace)
+                } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
+                    self.filter_smaps(run_config, groups, trace)
+                } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
+                    self.filter_memory(run_config, groups, trace)
+                } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
+                    self.filter_testcase(run_config, groups, trace)
+                } else {
+                    None
+                };
+
+            single_point.map(|p| vec![p])
         }
-
-        // For filters that return single point
-        let single_point: Option<Point<'a>> =
-            if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
-                self.filter_memory_url(run_config, groups, trace)
-            } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
-                self.filter_smaps(run_config, groups, trace)
-            } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
-                self.filter_memory(run_config, groups, trace)
-            } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
-                self.filter_testcase(run_config, groups, trace)
-            } else {
-                None
-            };
-
-        single_point.map(|p| vec![p])
     }
 
     /// Check if there are duplicates for PointType::Testcase and PointType::MemoryReport.
