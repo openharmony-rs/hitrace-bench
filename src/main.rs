@@ -242,7 +242,6 @@ fn main() -> Result<()> {
                     name: String::from("Explicit"),
                     match_str: String::from("explicit"),
                     no_unit_conversion: false,
-                    combined: false,
                     point_filter_type: PointFilterType::Default,
                 },
                 PointFilter::new(String::from("Resident"), String::from("resident")),
@@ -253,7 +252,6 @@ fn main() -> Result<()> {
                     name: String::from("resident-smaps"),
                     match_str: String::from("resident-according-to-smaps"),
                     no_unit_conversion: false,
-                    combined: true,
                     point_filter_type: PointFilterType::Combined,
                 },
             ];

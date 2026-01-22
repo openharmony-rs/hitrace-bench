@@ -14,9 +14,9 @@ use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::vec;
 
-const V1_INPUT_PATH: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("testdata/v1.ftrace"));
-const V5_INPUT_PATH: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("testdata/v5_1_1.ftrace"));
-const V5_LCP_INPUT_PATH: LazyLock<PathBuf> =
+static V1_INPUT_PATH: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("testdata/v1.ftrace"));
+static V5_INPUT_PATH: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("testdata/v5_1_1.ftrace"));
+static V5_LCP_INPUT_PATH: LazyLock<PathBuf> =
     LazyLock::new(|| PathBuf::from("testdata/v5_1_1_LCP.ftrace"));
 
 const V1_OUTPUT: &str = include_str!("../testdata/v1_output.json");
@@ -56,7 +56,6 @@ fn full_v5_with_lcp() {
             name: String::from("LargestContentfulPaint"),
             match_str: String::from("LargestContentfulPaint"),
             no_unit_conversion: true,
-            combined: false,
             point_filter_type: PointFilterType::Largest,
         }],
     );
@@ -68,7 +67,6 @@ fn test_testcaseprofiling_v1_v5() {
         name: String::from("TESTCASE_PROFILING"),
         match_str: String::from("generatehtml"),
         no_unit_conversion: true,
-        combined: false,
         point_filter_type: PointFilterType::Default,
     }];
 
@@ -98,7 +96,6 @@ fn test_lcp_v5() {
         name: String::from("LargestContentfulPaint"),
         match_str: String::from("LargestContentfulPaint"),
         no_unit_conversion: true,
-        combined: false,
         point_filter_type: PointFilterType::Largest,
     }];
 
@@ -187,7 +184,6 @@ fn parsing_common_with_extra_filters(
             name: String::from("Explicit"),
             match_str: String::from("explicit"),
             no_unit_conversion: false,
-            combined: false,
             point_filter_type: PointFilterType::Default,
         },
         PointFilter::new(String::from("Resident"), String::from("resident")),
@@ -198,7 +194,6 @@ fn parsing_common_with_extra_filters(
             name: String::from("resident-smaps"),
             match_str: String::from("resident-according-to-smaps"),
             no_unit_conversion: false,
-            combined: true,
             point_filter_type: PointFilterType::Combined,
         },
     ];
@@ -256,8 +251,6 @@ fn test_run_with_old_json() {
         point_results,
     })
     .unwrap();
-
-    // panic!("{:?}", result);
 
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&result).unwrap(),

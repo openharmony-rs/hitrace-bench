@@ -122,9 +122,6 @@ pub(crate) struct PointFilter {
     /// Should we not assume this is in kb?
     #[serde(default)]
     pub(crate) no_unit_conversion: bool,
-    /// With this we can combine all points that match a substring
-    #[serde(default)]
-    pub(crate) combined: bool,
     /// This is more flexible version of "combined", but did not replace it fully due to input json
     #[serde(default)]
     pub(crate) point_filter_type: PointFilterType,
@@ -136,16 +133,8 @@ impl PointFilter {
             name,
             match_str,
             no_unit_conversion: false,
-            combined: false,
             point_filter_type: PointFilterType::Default,
         }
-    }
-
-    pub(crate) fn finalize(mut self) -> Self {
-        if self.point_filter_type == PointFilterType::Default && self.combined {
-            self.point_filter_type = PointFilterType::Combined;
-        }
-        self
     }
 
     /// This filters sub memory reports with a url attached.
