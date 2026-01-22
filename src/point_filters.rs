@@ -13,7 +13,8 @@ use crate::{
 const SERVO_MEMORY_PROFILING_STRING: &str = "servo_memory_profiling";
 const SERVO_LCP_STRING: &str = "LargestContentfulPaint";
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, PartialOrd, Ord, Deserialize, Default)]
+// checked Default, Deserialize^,
+#[derive(Debug, Deserialize, Default)]
 pub(crate) enum PointFilterType {
     #[default]
     Default,
@@ -23,7 +24,6 @@ pub(crate) enum PointFilterType {
 
 /// We have different type of points which have different regexp.
 /// See the statics for a detailed explanation
-#[derive(Debug, Eq, PartialEq, Clone, PartialOrd, Ord, serde::Deserialize)]
 pub(crate) enum PointType {
     /// A memory report that has an url attached, like LayoutThread.
     MemoryUrl(u64),
@@ -99,7 +99,6 @@ static LCP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(LargestContentfulPaint)\|\w*\|(.*?)$").expect("Could not parse regexp")
 });
 
-#[derive(Debug)]
 /// A parsed trace point metric
 pub(crate) struct Point<'a> {
     /// The name you gave to this point
@@ -113,7 +112,7 @@ pub(crate) struct Point<'a> {
 }
 
 /// You might want to extract data points. These do not have a beginning and end, just a point.
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Deserialize)]
 pub(crate) struct PointFilter {
     /// The name we will use for this string
     pub(crate) name: String,

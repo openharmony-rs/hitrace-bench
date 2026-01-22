@@ -63,13 +63,6 @@ fn full_v5_with_lcp() {
 
 #[test]
 fn test_testcaseprofiling_v1_v5() {
-    let point_filters = vec![PointFilter {
-        name: String::from("TESTCASE_PROFILING"),
-        match_str: String::from("generatehtml"),
-        no_unit_conversion: true,
-        point_filter_type: PointFilterType::Default,
-    }];
-
     let expected_json = json!({
         "E2E/https://servo.org/": {
             "Data": {
@@ -81,11 +74,31 @@ fn test_testcaseprofiling_v1_v5() {
     });
 
     assert_eq!(
-        test_filters(V1_INPUT_PATH.to_path_buf(), vec![], point_filters.clone()).unwrap(),
+        test_filters(
+            V1_INPUT_PATH.to_path_buf(),
+            vec![],
+            vec![PointFilter {
+                name: String::from("TESTCASE_PROFILING"),
+                match_str: String::from("generatehtml"),
+                no_unit_conversion: true,
+                point_filter_type: PointFilterType::Default,
+            }]
+        )
+        .unwrap(),
         expected_json
     );
     assert_eq!(
-        test_filters(V5_INPUT_PATH.to_path_buf(), vec![], point_filters.clone()).unwrap(),
+        test_filters(
+            V5_INPUT_PATH.to_path_buf(),
+            vec![],
+            vec![PointFilter {
+                name: String::from("TESTCASE_PROFILING"),
+                match_str: String::from("generatehtml"),
+                no_unit_conversion: true,
+                point_filter_type: PointFilterType::Default,
+            }]
+        )
+        .unwrap(),
         expected_json
     );
 }
