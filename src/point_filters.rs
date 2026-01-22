@@ -329,17 +329,17 @@ impl PointFilter {
 
         // For filters that return single point
         let single_point: Option<Point<'a>> =
-        if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
-            self.filter_memory_url(run_config, groups, trace)
-        } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
-            self.filter_smaps(run_config, groups, trace)
-        } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
-            self.filter_memory(run_config, groups, trace)
-        } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
-            self.filter_testcase(run_config, groups, trace)
-        } else {
-            None
-        };
+            if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
+                self.filter_memory_url(run_config, groups, trace)
+            } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
+                self.filter_smaps(run_config, groups, trace)
+            } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
+                self.filter_memory(run_config, groups, trace)
+            } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
+                self.filter_testcase(run_config, groups, trace)
+            } else {
+                None
+            };
 
         single_point.map(|p| vec![p])
     }
@@ -446,7 +446,7 @@ impl PointFilter {
 }
 
 /// This function takes value from the hitrace-sys's start_trace_ex's `key=value,` string
-/// 
+///
 /// Example paint_time=CrossProcessInstant { value: 219733332872200 },area=90810,pipeline_id=(1,1)
 fn trace_kv_str_to_hashmap(input: &str) -> HashMap<String, String> {
     let mut result = HashMap::new();
@@ -495,16 +495,24 @@ fn trace_special_case_parser(value: String) -> Option<u64> {
 }
 
 #[test]
-fn test_trace_kv_parsing(){
-    let test_str = "paint_time=CrossProcessInstant { value: 219733332872200 },area=90810,pipeline_id=(1,1)".to_string();
-    
+fn test_trace_kv_parsing() {
+    let test_str =
+        "paint_time=CrossProcessInstant { value: 219733332872200 },area=90810,pipeline_id=(1,1)"
+            .to_string();
+
     assert_eq!(
         trace_kv_str_to_hashmap(&test_str),
         [
-            ("paint_time", "CrossProcessInstant { value: 219733332872200 }"),
+            (
+                "paint_time",
+                "CrossProcessInstant { value: 219733332872200 }"
+            ),
             ("area", "90810"),
             ("pipeline_id", "(1,1)")
-        ].into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect::<HashMap<String, String>>()
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect::<HashMap<String, String>>()
     );
 
     let test_case1_str = "CrossProcessInstant { value: 219733332872200 }".to_string();
