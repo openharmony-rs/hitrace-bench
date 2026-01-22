@@ -61,17 +61,15 @@ fn filter_iterator(result: &RunResults) -> impl std::iter::Iterator<Item = (Stri
 /// Creates an iterator for the point results with the appropriate map
 fn points_iterator(result: &RunResults) -> impl std::iter::Iterator<Item = (String, Bencher<'_>)> {
     result.point_results.iter().map(|(key, points)| {
-        let mut name = if points.no_unit_conversion {
+        let  name = if key.contains("LargestContentfulPaint/paint_time") {
+            "Nanoseconds"
+        } else if key.contains("LargestContentfulPaint/area") {
+            "Pixels"
+        } else if points.no_unit_conversion {
             "Data"
         } else {
             "Memory"
         };
-        if key.contains("LargestContentfulPaint/paint_time") {
-            name = "Nanoseconds";
-        }
-        if key.contains("LargestContentfulPaint/area") {
-            name = "Pixels";
-        }
         let mut map = HashMap::new();
         let avg_min_max = avg_min_max::<u64, u64>(&points.result);
         map.insert(
