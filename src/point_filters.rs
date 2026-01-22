@@ -33,7 +33,7 @@ pub(crate) enum PointType {
     Smaps(u64),
     /// Report of a testcase point.
     Testcase(u64),
-    /// Something we will combine.
+    /// A testcase point that will be the sum of all matches points.
     Combined(u64),
     /// LCP
     LargestContentfulPaint(u64),
