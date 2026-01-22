@@ -280,7 +280,7 @@ impl PointFilter {
         let _whole_match = match_iter.next();
         let filter_name = match_iter.next().expect("Could not find match").as_str();
         let key_values = match_iter.next().expect("Could not find match").as_str();
-        let kv_hashmap = Self::trace_kv_str_to_hashmap(key_values.to_string());
+        let kv_hashmap = trace_kv_str_to_hashmap(key_values);
 
         if filter_name == SERVO_LCP_STRING {
             Some(vec![
@@ -291,7 +291,7 @@ impl PointFilter {
                         + "/paint_time",
                     no_unit_conversion: self.no_unit_conversion,
                     trace: Some(trace),
-                    point_type: PointType::LargestContentfulPaint(Self::trace_special_case_parser(
+                    point_type: PointType::LargestContentfulPaint(trace_special_case_parser(
                         kv_hashmap
                             .get("paint_time")
                             .expect("[paint_time] field was not found in the LCP trace")
@@ -316,32 +316,6 @@ impl PointFilter {
         }
     }
 
-    fn trace_kv_str_to_hashmap(input: String) -> HashMap<String, String> {
-        input
-            .split(',')
-            .filter_map(|pair| {
-                let (key, value) = pair.split_once('=')?;
-                Some((key.to_string(), value.to_string()))
-            })
-            .collect()
-    }
-
-    /// This function is only here because in servo/servo CrossProcessInstant does not export value
-    fn trace_special_case_parser(value: String) -> Option<u64> {
-        if let Ok(v) = value.parse::<u64>() {
-            return Some(v);
-        }
-
-        // Handle: CrossProcessInstant { value: 219733332872200 }
-        const PREFIX: &str = "CrossProcessInstant { value: ";
-        const SUFFIX: &str = " }";
-
-        value
-            .strip_prefix(PREFIX)
-            .and_then(|v| v.strip_suffix(SUFFIX))
-            .and_then(|v| v.parse::<u64>().ok())
-    }
-
     /// This is the main filter function which will call the corresponding filter functions
     fn filter_trace_to_option_point<'a>(
         &'a self,
@@ -355,17 +329,17 @@ impl PointFilter {
 
         // For filters that return single point
         let single_point: Option<Point<'a>> =
-            if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
-                self.filter_memory_url(run_config, groups, trace)
-            } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
-                self.filter_smaps(run_config, groups, trace)
-            } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
-                self.filter_memory(run_config, groups, trace)
-            } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
-                self.filter_testcase(run_config, groups, trace)
-            } else {
-                None
-            };
+        if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
+            self.filter_memory_url(run_config, groups, trace)
+        } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
+            self.filter_smaps(run_config, groups, trace)
+        } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
+            self.filter_memory(run_config, groups, trace)
+        } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
+            self.filter_testcase(run_config, groups, trace)
+        } else {
+            None
+        };
 
         single_point.map(|p| vec![p])
     }
@@ -469,4 +443,73 @@ impl PointFilter {
             points
         }
     }
+}
+
+/// This function takes value from the hitrace-sys's start_trace_ex's `key=value,` string
+/// 
+/// Example paint_time=CrossProcessInstant { value: 219733332872200 },area=90810,pipeline_id=(1,1)
+fn trace_kv_str_to_hashmap(input: &str) -> HashMap<String, String> {
+    let mut result = HashMap::new();
+    let mut depth = 0;
+    let mut last_split = 0;
+
+    // Due to nesting, instead of expected simple split by comma
+    // I have to check for open nested brakest or parantaces
+    // I do not parse the whole thing, just the top level key values
+    for (i, c) in input.char_indices() {
+        match c {
+            '(' | '{' | '[' => depth += 1,
+            ')' | '}' | ']' => depth -= 1,
+            ',' if depth == 0 => {
+                if let Some((k, v)) = input[last_split..i].split_once('=') {
+                    result.insert(k.to_string(), v.to_string());
+                }
+                last_split = i + 1;
+            }
+            _ => {}
+        }
+    }
+
+    // Handle last segment
+    if let Some((k, v)) = input[last_split..].split_once('=') {
+        result.insert(k.to_string(), v.to_string());
+    }
+
+    result
+}
+
+/// This function is only here because in servo/servo CrossProcessInstant does not export value
+fn trace_special_case_parser(value: String) -> Option<u64> {
+    if let Ok(v) = value.parse::<u64>() {
+        return Some(v);
+    }
+
+    // Handle: CrossProcessInstant { value: 219733332872200 }
+    const PREFIX: &str = "CrossProcessInstant { value: ";
+    const SUFFIX: &str = " }";
+
+    value
+        .strip_prefix(PREFIX)
+        .and_then(|v| v.strip_suffix(SUFFIX))
+        .and_then(|v| v.parse::<u64>().ok())
+}
+
+#[test]
+fn test_trace_kv_parsing(){
+    let test_str = "paint_time=CrossProcessInstant { value: 219733332872200 },area=90810,pipeline_id=(1,1)".to_string();
+    
+    assert_eq!(
+        trace_kv_str_to_hashmap(&test_str),
+        [
+            ("paint_time", "CrossProcessInstant { value: 219733332872200 }"),
+            ("area", "90810"),
+            ("pipeline_id", "(1,1)")
+        ].into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect::<HashMap<String, String>>()
+    );
+
+    let test_case1_str = "CrossProcessInstant { value: 219733332872200 }".to_string();
+    assert_eq!(
+        trace_special_case_parser(test_case1_str),
+        Some(219733332872200)
+    );
 }
