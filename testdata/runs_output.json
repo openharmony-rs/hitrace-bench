@@ -1,0 +1,65 @@
+{
+    "E2E/https://www.google.com/Resident": {
+        "Memory": {
+            "lower_value": 403623936.0,
+            "upper_value": 403623936.0,
+            "value": 403623936.0
+        }
+    },
+    "E2E/https://www.google.com/resident-smaps": {
+        "Memory": {
+            "lower_value": 404639744.0,
+            "upper_value": 404639744.0,
+            "value": 404639744.0
+        }
+    },
+    "E2E/https://www.servo.org/Resident": {
+        "Memory": {
+            "lower_value": 403623936.0,
+            "upper_value": 403623936.0,
+            "value": 403623936.0
+        }
+    },
+    "E2E/https://www.servo.org/resident-smaps": {
+        "Memory": {
+            "lower_value": 404639744.0,
+            "upper_value": 404639744.0,
+            "value": 404639744.0
+        }
+    },
+    "E2E/Load": {
+        "Latency": {
+            "lower_value": 1970970000.0,
+            "upper_value": 1970970000.0,
+            "value": 1970970000.0
+        }
+    },
+    "E2E/https://www.google.com/LargestContentfulPaint/area": {
+        "Pixels": {
+            "lower_value": 90810.0,
+            "upper_value": 90810.0,
+            "value": 90810.0
+        }
+    }, 
+    "E2E/https://www.google.com/LargestContentfulPaint/paint_time": {
+        "Nanoseconds": {
+            "lower_value": 231277380060022.0,
+            "upper_value": 231277380060022.0,
+            "value": 231277380060022.0
+        }
+    },
+    "E2E/https://www.servo.org/LargestContentfulPaint/area": {
+        "Pixels": {
+            "lower_value": 90810.0,
+            "upper_value": 90810.0,
+            "value": 90810.0
+        }
+    },
+    "E2E/https://www.servo.org/LargestContentfulPaint/paint_time": {
+        "Nanoseconds": {
+            "lower_value": 231277380060022.0,
+            "upper_value": 231277380060022.0,
+            "value": 231277380060022.0
+        }
+    }
+}

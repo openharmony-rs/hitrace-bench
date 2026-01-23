@@ -11,7 +11,11 @@ use trace::Trace;
 use utils::{FilterErrors, FilterResults, PointResults, RunResults, avg_min_max};
 use yansi::{Condition, Paint};
 
-use crate::{args::RunArgs, point_filters::PointFilter, utils::PointResult};
+use crate::{
+    args::RunArgs,
+    point_filters::{PointFilter, PointFilterType},
+    utils::PointResult,
+};
 
 mod args;
 mod bencher;
@@ -126,10 +130,10 @@ fn run_runconfig_points(run_config: &RunConfig, traces: &[Trace], points: &mut P
         let key = p.name.to_owned();
         points
             .entry(key)
-            .and_modify(|v| v.result.push(p.value))
+            .and_modify(|v| v.result.push(p.point_type.numeric_value().unwrap()))
             .or_insert(PointResult {
                 no_unit_conversion: p.no_unit_conversion,
-                result: vec![p.value],
+                result: vec![p.point_type.numeric_value().unwrap()],
             });
     }
 }
@@ -238,7 +242,7 @@ fn main() -> Result<()> {
                     name: String::from("Explicit"),
                     match_str: String::from("explicit"),
                     no_unit_conversion: false,
-                    combined: false,
+                    point_filter_type: PointFilterType::Default,
                 },
                 PointFilter::new(String::from("Resident"), String::from("resident")),
                 PointFilter::new(String::from("LayoutThread"), String::from("layout-thread")),
@@ -248,7 +252,7 @@ fn main() -> Result<()> {
                     name: String::from("resident-smaps"),
                     match_str: String::from("resident-according-to-smaps"),
                     no_unit_conversion: false,
-                    combined: true,
+                    point_filter_type: PointFilterType::Combined,
                 },
             ];
 

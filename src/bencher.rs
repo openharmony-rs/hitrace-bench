@@ -61,7 +61,11 @@ fn filter_iterator(result: &RunResults) -> impl std::iter::Iterator<Item = (Stri
 /// Creates an iterator for the point results with the appropriate map
 fn points_iterator(result: &RunResults) -> impl std::iter::Iterator<Item = (String, Bencher<'_>)> {
     result.point_results.iter().map(|(key, points)| {
-        let name = if points.no_unit_conversion {
+        let name = if key.contains("LargestContentfulPaint/paint_time") {
+            "Nanoseconds"
+        } else if key.contains("LargestContentfulPaint/area") {
+            "Pixels"
+        } else if points.no_unit_conversion {
             "Data"
         } else {
             "Memory"

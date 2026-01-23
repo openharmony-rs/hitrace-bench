@@ -11,21 +11,45 @@ use crate::{
 };
 
 const SERVO_MEMORY_PROFILING_STRING: &str = "servo_memory_profiling";
+const SERVO_LCP_STRING: &str = "LargestContentfulPaint";
+
+// checked Default, Deserialize^,
+#[derive(Debug, Deserialize, Default)]
+pub(crate) enum PointFilterType {
+    #[default]
+    Default,
+    Combined,
+    Largest,
+}
 
 /// We have different type of points which have different regexp.
 /// See the statics for a detailed explanation
-#[derive(Debug, Eq, PartialEq)]
 pub(crate) enum PointType {
     /// A memory report that has an url attached, like LayoutThread.
-    MemoryUrl,
+    MemoryUrl(u64),
     /// A simple memory report, corresponding to resident-memory most likely.
-    MemoryReport,
+    MemoryReport(u64),
     /// Report of smaps.
-    Smaps,
+    Smaps(u64),
     /// Report of a testcase point.
-    Testcase,
-    /// Something we will combine.
-    Combined,
+    Testcase(u64),
+    /// A testcase point that will be the sum of all matches points.
+    Combined(u64),
+    /// LCP
+    LargestContentfulPaint(u64),
+}
+
+impl PointType {
+    pub fn numeric_value(&self) -> Option<u64> {
+        match self {
+            PointType::MemoryUrl(v)
+            | PointType::MemoryReport(v)
+            | PointType::Smaps(v)
+            | PointType::Testcase(v)
+            | PointType::Combined(v)
+            | PointType::LargestContentfulPaint(v) => Some(*v),
+        }
+    }
 }
 
 /// Notice that this also matches MEMORY_URL_REPORT
@@ -66,18 +90,24 @@ static TESTCASE_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(concat!(
         r"^TESTCASE_PROFILING: (.*?) (\d+)$",
         "|",
-        r"^TESTCASE_PROFILING: (.*?)\|(\d+)|\w*$"
+        r"^TESTCASE_PROFILING: (.*?)\|(\d+)\|\w*$"
     ))
     .expect("Could not parse regexp")
 });
 
-#[derive(Debug)]
+static LCP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(LargestContentfulPaint)\|\w*\|(.*?)$").expect("Could not parse regexp")
+});
+
+static CROSS_PROCESS_INSTANT: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^paint_time=CrossProcessInstant\s*\{\s*value:\s*(\d+)\s*\},area=(\d*).*$")
+        .expect("Could not parse regexp")
+});
+
 /// A parsed trace point metric
 pub(crate) struct Point<'a> {
     /// The name you gave to this point
     pub(crate) name: String,
-    /// The value of the point
-    pub(crate) value: u64,
     /// Do not convert units
     pub(crate) no_unit_conversion: bool,
     /// The type of point this matches to
@@ -87,7 +117,7 @@ pub(crate) struct Point<'a> {
 }
 
 /// You might want to extract data points. These do not have a beginning and end, just a point.
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Deserialize)]
 pub(crate) struct PointFilter {
     /// The name we will use for this string
     pub(crate) name: String,
@@ -96,9 +126,9 @@ pub(crate) struct PointFilter {
     /// Should we not assume this is in kb?
     #[serde(default)]
     pub(crate) no_unit_conversion: bool,
-    /// With this we combine all points that match a substring
+    /// This is more flexible version of "combined", but did not replace it fully due to input json
     #[serde(default)]
-    pub(crate) combined: bool,
+    pub(crate) point_filter_type: PointFilterType,
 }
 
 impl PointFilter {
@@ -107,7 +137,7 @@ impl PointFilter {
             name,
             match_str,
             no_unit_conversion: false,
-            combined: false,
+            point_filter_type: PointFilterType::Default,
         }
     }
 
@@ -138,10 +168,9 @@ impl PointFilter {
                     + "/"
                     + self.name.as_str()
                     + suffix.as_str(),
-                value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
-                point_type: PointType::MemoryUrl,
+                point_type: PointType::MemoryUrl(value),
             })
         } else {
             None
@@ -170,10 +199,9 @@ impl PointFilter {
                 .expect("Could not parse");
             Some(Point {
                 name: run_config.run_args.url.to_owned() + "/" + self.name.as_str(),
-                value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
-                point_type: PointType::Smaps,
+                point_type: PointType::Smaps(value),
             })
         }
     }
@@ -197,10 +225,9 @@ impl PointFilter {
             .expect("Could not parse value");
         Some(Point {
             name: run_config.run_args.url.to_owned() + "/" + self.name.as_str(),
-            value,
             no_unit_conversion: self.no_unit_conversion,
             trace: Some(trace),
-            point_type: PointType::MemoryReport,
+            point_type: PointType::MemoryReport(value),
         })
     }
 
@@ -225,11 +252,46 @@ impl PointFilter {
         if case_name.contains(&self.match_str) {
             Some(Point {
                 name: run_config.run_args.url.to_owned() + "/",
-                value,
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
-                point_type: PointType::Testcase,
+                point_type: PointType::Testcase(value),
             })
+        } else {
+            None
+        }
+    }
+
+    /// This filters LCP cases
+    fn filter_lcp<'a>(
+        &'a self,
+        run_config: &RunConfig,
+        groups: Captures,
+        trace: &'a Trace,
+    ) -> Option<Vec<Point<'a>>> {
+        let mut match_iter = groups.iter().flatten();
+        let _whole_match = match_iter.next();
+        let filter_name = match_iter.next().expect("Could not find match").as_str();
+        let key_values = match_iter.next().expect("Could not find match").as_str();
+        let lcp_values = parse_lcp_trace(key_values).expect("Could not parse LCP values");
+
+        if filter_name == SERVO_LCP_STRING {
+            Some(vec![
+                Point {
+                    name: run_config.run_args.url.to_owned()
+                        + "/"
+                        + self.name.as_str()
+                        + "/paint_time",
+                    no_unit_conversion: self.no_unit_conversion,
+                    trace: Some(trace),
+                    point_type: PointType::LargestContentfulPaint(lcp_values.paint_time),
+                },
+                Point {
+                    name: run_config.run_args.url.to_owned() + "/" + self.name.as_str() + "/area",
+                    no_unit_conversion: self.no_unit_conversion,
+                    trace: Some(trace),
+                    point_type: PointType::LargestContentfulPaint(lcp_values.area),
+                },
+            ])
         } else {
             None
         }
@@ -240,17 +302,26 @@ impl PointFilter {
         &'a self,
         trace: &'a Trace,
         run_config: &RunConfig,
-    ) -> Option<Point<'a>> {
-        if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
-            self.filter_memory_url(run_config, groups, trace)
-        } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
-            self.filter_smaps(run_config, groups, trace)
-        } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
-            self.filter_memory(run_config, groups, trace)
-        } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
-            self.filter_testcase(run_config, groups, trace)
+    ) -> Option<Vec<Point<'a>>> {
+        if let Some(groups) = LCP_REGEX.captures(&trace.function) {
+            // For filters that return vector of points
+            self.filter_lcp(run_config, groups, trace)
         } else {
-            None
+            // For filters that return single point
+            let single_point: Option<Point<'a>> =
+                if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
+                    self.filter_memory_url(run_config, groups, trace)
+                } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
+                    self.filter_smaps(run_config, groups, trace)
+                } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
+                    self.filter_memory(run_config, groups, trace)
+                } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
+                    self.filter_testcase(run_config, groups, trace)
+                } else {
+                    None
+                };
+
+            single_point.map(|p| vec![p])
         }
     }
 
@@ -259,7 +330,7 @@ impl PointFilter {
     fn remove_duplicates(&self, points: &mut Vec<Point>) {
         if points
             .iter()
-            .filter(|p| p.point_type == PointType::Testcase)
+            .filter(|p| matches!(p.point_type, PointType::Testcase(_)))
             .count()
             > 1
         {
@@ -271,12 +342,12 @@ impl PointFilter {
                     .filter_map(|p| p.trace)
                     .collect::<Vec<&Trace>>()
             );
-            points.retain(|p| p.point_type != PointType::Testcase);
+            points.retain(|p| !matches!(p.point_type, PointType::Testcase(_)));
         }
 
         if points
             .iter()
-            .filter(|p| p.point_type == PointType::MemoryReport)
+            .filter(|p| matches!(p.point_type, PointType::MemoryReport(_)))
             .count()
             > 1
         {
@@ -288,7 +359,7 @@ impl PointFilter {
                     .filter_map(|p| p.trace)
                     .collect::<Vec<&Trace>>()
             );
-            points.retain(|p| p.point_type != PointType::MemoryReport);
+            points.retain(|p| !matches!(p.point_type, PointType::MemoryReport(_)));
         }
     }
 
@@ -300,16 +371,20 @@ impl PointFilter {
     ) -> Vec<Point<'a>> {
         let mut points: Vec<_> = traces
             .iter()
-            .filter(|t| t.trace_marker == TraceMarker::Dot)
+            .filter(|t| {
+                t.trace_marker == TraceMarker::Dot || t.trace_marker == TraceMarker::StartSync
+            })
             .filter(|t| {
                 t.function.contains(SERVO_MEMORY_PROFILING_STRING)
                     || t.function.contains("TESTCASE_PROFILING")
+                    || t.function.contains(SERVO_LCP_STRING)
             })
             .filter(|t| t.function.contains(&self.match_str))
             .filter_map(|t| self.filter_trace_to_option_point(t, run_config))
+            .flatten()
             .collect();
 
-        if self.combined {
+        if !matches!(self.point_filter_type, PointFilterType::Default) {
             // we now need to collect points with the same name
             points
                 .into_iter()
@@ -321,10 +396,24 @@ impl PointFilter {
                     } else {
                         Point {
                             name,
-                            value: vals.iter().map(|p| p.value).sum(),
                             no_unit_conversion: vals.first().unwrap().no_unit_conversion,
                             trace: None,
-                            point_type: PointType::Combined,
+                            point_type: match self.point_filter_type {
+                                PointFilterType::Largest => PointType::LargestContentfulPaint(
+                                    vals.iter()
+                                        .map(|p| p.point_type.numeric_value().unwrap())
+                                        .max()
+                                        .unwrap(),
+                                ),
+
+                                PointFilterType::Combined => PointType::Combined(
+                                    vals.iter()
+                                        .map(|p| p.point_type.numeric_value().unwrap())
+                                        .sum(),
+                                ),
+
+                                PointFilterType::Default => panic!("should not be reachable"),
+                            },
                         }
                     }
                 })
@@ -334,4 +423,47 @@ impl PointFilter {
             points
         }
     }
+}
+
+#[derive(PartialEq, Debug)]
+struct LCPTraceValues {
+    paint_time: u64,
+    area: u64,
+}
+/// This function takes value from the hitrace-sys's start_trace_ex's `key=value,` string
+///
+/// Example paint_time=CrossProcessInstant { value: 219733332872200 },area=90810,pipeline_id=(1,1)
+fn parse_lcp_trace(input: &str) -> Option<LCPTraceValues> {
+    if let Some(groups) = CROSS_PROCESS_INSTANT.captures(input) {
+        return Some(LCPTraceValues {
+            paint_time: groups
+                .get(1)
+                .expect("Could not find paint_time in LCP trace using REGEX")
+                .as_str()
+                .parse()
+                .expect("Count not parse paint_time from LCP trace using REGEX"),
+            area: groups
+                .get(2)
+                .expect("Could not find paint_time in LCP trace using REGEX")
+                .as_str()
+                .parse()
+                .expect("Count not parse paint_time from LCP trace using REGEX"),
+        });
+    }
+    None
+}
+
+#[test]
+fn test_trace_kv_parsing() {
+    let test_str =
+        "paint_time=CrossProcessInstant { value: 231277222481376 },area=4095,lcp_type=Image,pipeline_id=(1,1)"
+            .to_string();
+
+    assert_eq!(
+        parse_lcp_trace(&test_str),
+        Some(LCPTraceValues {
+            paint_time: 231277222481376,
+            area: 4095
+        })
+    );
 }
