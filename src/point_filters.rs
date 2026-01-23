@@ -476,6 +476,7 @@ fn test_trace_kv_parsing() {
     let test_str =
         "paint_time=CrossProcessInstant { value: 231277222481376 },area=4095,lcp_type=Image,pipeline_id=(1,1)"
             .to_string();
+
     assert_eq!(
         parse_lcp_trace(&test_str),
         Some(LCPTraceValues {
