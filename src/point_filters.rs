@@ -12,6 +12,7 @@ use crate::{
 
 const SERVO_MEMORY_PROFILING_STRING: &str = "servo_memory_profiling";
 const SERVO_LCP_STRING: &str = "LargestContentfulPaint";
+const SERVO_FCP_STRING: &str = "FirstContentfulPaint";
 
 // checked Default, Deserialize^,
 #[derive(Debug, Deserialize, Default)]
@@ -99,8 +100,16 @@ static LCP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(LargestContentfulPaint)\|\w*\|(.*?)$").expect("Could not parse regexp")
 });
 
+static FCP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^(FirstContentfulPaint)\|\w*\|(.*?)$").expect("Could not parse regexp")
+});
+
+/// This regex is to parse LCP and FCP key=value pair field
+///
+/// LCP case: paint_time=CrossProcessInstant { value: 231277222481376 },area=4095,lcp_type=Image,pipeline_id=(1,1)
+/// FCP case: epoch=Epoch(1),paint_time=CrossProcessInstant { value: 271633800350218 },pipeline_id=(1,1)
 static CROSS_PROCESS_INSTANT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^paint_time=CrossProcessInstant\s*\{\s*value:\s*(\d+)\s*\},area=(\d*).*$")
+    Regex::new(r"^(?:epoch=Epoch\(\d*\),)?paint_time=CrossProcessInstant\s*\{\s*value:\s*(\d+)\s*\},(?:area=(\d*).*$)?")
         .expect("Could not parse regexp")
 });
 
@@ -262,7 +271,7 @@ impl PointFilter {
     }
 
     /// This filters LCP cases
-    fn filter_lcp<'a>(
+    fn filter_lcp_or_fcp<'a>(
         &'a self,
         run_config: &RunConfig,
         groups: Captures,
@@ -272,9 +281,9 @@ impl PointFilter {
         let _whole_match = match_iter.next();
         let filter_name = match_iter.next().expect("Could not find match").as_str();
         let key_values = match_iter.next().expect("Could not find match").as_str();
-        let lcp_values = parse_lcp_trace(key_values).expect("Could not parse LCP values");
 
         if filter_name == SERVO_LCP_STRING {
+            let lcp_values = parse_lcp_trace(key_values).expect("Could not parse LCP values");
             Some(vec![
                 Point {
                     name: run_config.run_args.url.to_owned()
@@ -292,6 +301,17 @@ impl PointFilter {
                     point_type: PointType::LargestContentfulPaint(lcp_values.area),
                 },
             ])
+        } else if filter_name == SERVO_FCP_STRING {
+            Some(vec![Point {
+                name: run_config.run_args.url.to_owned() + "/" + self.name.as_str() + "/paint_time",
+                no_unit_conversion: self.no_unit_conversion,
+                trace: Some(trace),
+                point_type: PointType::LargestContentfulPaint(
+                    parse_fcp_trace(key_values)
+                        .expect("Could not parse LCP values")
+                        .paint_time,
+                ),
+            }])
         } else {
             None
         }
@@ -304,24 +324,22 @@ impl PointFilter {
         run_config: &RunConfig,
     ) -> Option<Vec<Point<'a>>> {
         if let Some(groups) = LCP_REGEX.captures(&trace.function) {
-            // For filters that return vector of points
-            self.filter_lcp(run_config, groups, trace)
+            self.filter_lcp_or_fcp(run_config, groups, trace)
+        } else if let Some(groups) = FCP_REGEX.captures(&trace.function) {
+            self.filter_lcp_or_fcp(run_config, groups, trace)
         } else {
-            // For filters that return single point
-            let single_point: Option<Point<'a>> =
-                if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
-                    self.filter_memory_url(run_config, groups, trace)
-                } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
-                    self.filter_smaps(run_config, groups, trace)
-                } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
-                    self.filter_memory(run_config, groups, trace)
-                } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
-                    self.filter_testcase(run_config, groups, trace)
-                } else {
-                    None
-                };
-
-            single_point.map(|p| vec![p])
+            if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
+                self.filter_memory_url(run_config, groups, trace)
+            } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
+                self.filter_smaps(run_config, groups, trace)
+            } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
+                self.filter_memory(run_config, groups, trace)
+            } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
+                self.filter_testcase(run_config, groups, trace)
+            } else {
+                None
+            }
+            .map(|p| vec![p])
         }
     }
 
@@ -378,6 +396,7 @@ impl PointFilter {
                 t.function.contains(SERVO_MEMORY_PROFILING_STRING)
                     || t.function.contains("TESTCASE_PROFILING")
                     || t.function.contains(SERVO_LCP_STRING)
+                    || t.function.contains(SERVO_FCP_STRING)
             })
             .filter(|t| t.function.contains(&self.match_str))
             .filter_map(|t| self.filter_trace_to_option_point(t, run_config))
@@ -434,8 +453,9 @@ struct LCPTraceValues {
 ///
 /// Example paint_time=CrossProcessInstant { value: 219733332872200 },area=90810,pipeline_id=(1,1)
 fn parse_lcp_trace(input: &str) -> Option<LCPTraceValues> {
-    if let Some(groups) = CROSS_PROCESS_INSTANT.captures(input) {
-        return Some(LCPTraceValues {
+    CROSS_PROCESS_INSTANT
+        .captures(input)
+        .map(|groups| LCPTraceValues {
             paint_time: groups
                 .get(1)
                 .expect("Could not find paint_time in LCP trace using REGEX")
@@ -448,9 +468,7 @@ fn parse_lcp_trace(input: &str) -> Option<LCPTraceValues> {
                 .as_str()
                 .parse()
                 .expect("Count not parse paint_time from LCP trace using REGEX"),
-        });
-    }
-    None
+        })
 }
 
 #[test]
@@ -464,6 +482,53 @@ fn test_trace_kv_parsing() {
         Some(LCPTraceValues {
             paint_time: 231277222481376,
             area: 4095
+        })
+    );
+}
+
+#[derive(PartialEq, Debug)]
+struct FCPTraceValue {
+    paint_time: u64,
+}
+
+/// This function takes value from the hitrace-sys's start_trace_ex's `key=value,` string
+///
+/// Example "epoch=Epoch(1),paint_time=CrossProcessInstant { value: 271633800350218 },pipeline_id=(1,1)"
+fn parse_fcp_trace(input: &str) -> Option<FCPTraceValue> {
+    if let Some(groups) = CROSS_PROCESS_INSTANT.captures(input) {
+        return Some(FCPTraceValue {
+            paint_time: groups
+                .get(1)
+                .expect("Could not find paint_time in LCP trace using REGEX")
+                .as_str()
+                .parse()
+                .expect("Count not parse paint_time from LCP trace using REGEX"),
+        });
+    }
+    None
+}
+
+#[test]
+fn test_lcp_parsing() {
+    assert_eq!(
+        parse_lcp_trace(
+            "paint_time=CrossProcessInstant { value: 231277222481376 },area=4095,lcp_type=Image,pipeline_id=(1,1)"
+        ),
+        Some(LCPTraceValues {
+            paint_time: 231277222481376,
+            area: 4095
+        })
+    );
+}
+
+#[test]
+fn test_fcp_parsing() {
+    assert_eq!(
+        parse_fcp_trace(
+            "epoch=Epoch(1),paint_time=CrossProcessInstant { value: 271633800350218 },pipeline_id=(1,1)"
+        ),
+        Some(FCPTraceValue {
+            paint_time: 271633800350218,
         })
     );
 }

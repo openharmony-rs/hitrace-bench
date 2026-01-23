@@ -1,0 +1,135 @@
+{
+  "E2E/https://servo.org/JS/malloc-heap": {
+    "Memory": {
+      "value": 5483027.0,
+      "lower_value": 5483027.0,
+      "upper_value": 5483027.0
+    }
+  },
+  "E2E/https://servo.org/image-cache": {
+    "Memory": {
+      "value": 3718280.0,
+      "lower_value": 3718280.0,
+      "upper_value": 3718280.0
+    }
+  },
+  "E2E/Surface->LoadStart": {
+    "Latency": {
+      "value": 866755000.0,
+      "lower_value": 866755000.0,
+      "upper_value": 866755000.0
+    }
+  },
+  "E2E/https://servo.org/JS/gc-heap/used": {
+    "Memory": {
+      "value": 541520.0,
+      "lower_value": 541520.0,
+      "upper_value": 541520.0
+    }
+  },
+  "E2E/https://servo.org/Resident": {
+    "Memory": {
+      "value": 403623936.0,
+      "lower_value": 403623936.0,
+      "upper_value": 403623936.0
+    }
+  },
+  "E2E/https://servo.org/LayoutThread/display-list": {
+    "Memory": {
+      "value": 0.0,
+      "lower_value": 0.0,
+      "upper_value": 0.0
+    }
+  },
+  "E2E/https://servo.org/resident-smaps": {
+    "Memory": {
+      "value": 404639744.0,
+      "lower_value": 404639744.0,
+      "upper_value": 404639744.0
+    }
+  },
+  "E2E/https://servo.org/JS/gc-heap/decommitted": {
+    "Memory": {
+      "value": 339968.0,
+      "lower_value": 339968.0,
+      "upper_value": 339968.0
+    }
+  },
+  "E2E/Load->Compl": {
+    "Latency": {
+      "value": 1104215000.0,
+      "lower_value": 1104215000.0,
+      "upper_value": 1104215000.0
+    }
+  },
+  "E2E/https://servo.org/image-cache/fontdb": {
+    "Memory": {
+      "value": 0.0,
+      "lower_value": 0.0,
+      "upper_value": 0.0
+    }
+  },
+  "E2E/https://servo.org/LayoutThread/stylist": {
+    "Memory": {
+      "value": 498871.0,
+      "lower_value": 498871.0,
+      "upper_value": 498871.0
+    }
+  },
+  "E2E/https://servo.org/LayoutThread/fragment-tree": {
+    "Memory": {
+      "value": 112.0,
+      "lower_value": 112.0,
+      "upper_value": 112.0
+    }
+  },
+  "E2E/https://servo.org/LayoutThread/box-tree": {
+    "Memory": {
+      "value": 84708496.0,
+      "lower_value": 84708496.0,
+      "upper_value": 84708496.0
+    }
+  },
+  "E2E/https://servo.org/JS/gc-heap/unused": {
+    "Memory": {
+      "value": 139248.0,
+      "lower_value": 139248.0,
+      "upper_value": 139248.0
+    }
+  },
+  "E2E/https://servo.org/JS/gc-heap/admin": {
+    "Memory": {
+      "value": 27840.0,
+      "lower_value": 27840.0,
+      "upper_value": 27840.0
+    }
+  },
+  "E2E/https://servo.org/LayoutThread/font-context": {
+    "Memory": {
+      "value": 396720.0,
+      "lower_value": 396720.0,
+      "upper_value": 396720.0
+    }
+  },
+  "E2E/https://servo.org/JS/non-heap": {
+    "Memory": {
+      "value": 262144.0,
+      "lower_value": 262144.0,
+      "upper_value": 262144.0
+    }
+  },
+  "E2E/https://servo.org/LayoutThread/stacking-context-tree": {
+    "Memory": {
+      "value": 167760.0,
+      "lower_value": 167760.0,
+      "upper_value": 167760.0
+    }
+  },
+  "E2E/https://servo.org/FirstContentfulPaint/paint_time": {
+    "Nanoseconds": {
+      "value": 271633800350218.0,
+      "lower_value": 271633800350218.0,
+      "upper_value": 271633800350218.0
+    }
+  }
+}
