@@ -54,6 +54,10 @@
                 "name": "LargestContentfulPaint",
                 "match_str": "LargestContentfulPaint",
                 "point_filter_type": "Largest"
+            },
+            {
+                "name": "FirstContentfulPaint",
+                "match_str": "FirstContentfulPaint"
             }
         ]
     },
@@ -99,6 +103,10 @@
                 "name": "LargestContentfulPaint",
                 "match_str": "LargestContentfulPaint",
                 "point_filter_type": "Largest"
+            },
+            {
+                "name": "FirstContentfulPaint",
+                "match_str": "FirstContentfulPaint"
             }
         ]
     },
