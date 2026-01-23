@@ -238,7 +238,6 @@ impl PointFilter {
         groups: Captures,
         trace: &'a Trace,
     ) -> Option<Point<'a>> {
-        println!(">>> {:?}", groups);
         let mut match_iter = groups.iter().flatten();
         let _whole_match = match_iter.next();
         let name = match_iter.next();
@@ -274,7 +273,6 @@ impl PointFilter {
         let filter_name = match_iter.next().expect("Could not find match").as_str();
         let key_values = match_iter.next().expect("Could not find match").as_str();
         let lcp_values = parse_lcp_trace(key_values).expect("Could not parse LCP values");
-        println!(">>> {:?}, {:?}", key_values, lcp_values);
 
         if filter_name == SERVO_LCP_STRING {
             Some(vec![
