@@ -323,32 +323,23 @@ impl PointFilter {
         trace: &'a Trace,
         run_config: &RunConfig,
     ) -> Option<Vec<Point<'a>>> {
-        let multi_point: Option<Vec<Point<'a>>> =
-            if let Some(groups) = LCP_REGEX.captures(&trace.function) {
-                self.filter_lcp_or_fcp(run_config, groups, trace)
-            } else if let Some(groups) = FCP_REGEX.captures(&trace.function) {
-                self.filter_lcp_or_fcp(run_config, groups, trace)
+        if let Some(groups) = LCP_REGEX.captures(&trace.function) {
+            self.filter_lcp_or_fcp(run_config, groups, trace)
+        } else if let Some(groups) = FCP_REGEX.captures(&trace.function) {
+            self.filter_lcp_or_fcp(run_config, groups, trace)
+        } else {
+            if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
+                self.filter_memory_url(run_config, groups, trace)
+            } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
+                self.filter_smaps(run_config, groups, trace)
+            } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
+                self.filter_memory(run_config, groups, trace)
+            } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
+                self.filter_testcase(run_config, groups, trace)
             } else {
                 None
-            };
-        if multi_point.is_none() {
-            // For filters that return single point
-            let single_point: Option<Point<'a>> =
-                if let Some(groups) = MEMORY_URL_REPORT_REGEX.captures(&trace.function) {
-                    self.filter_memory_url(run_config, groups, trace)
-                } else if let Some(groups) = SMAPS_REGEX.captures(&trace.function) {
-                    self.filter_smaps(run_config, groups, trace)
-                } else if let Some(groups) = MEMORY_REPORT_REGEX.captures(&trace.function) {
-                    self.filter_memory(run_config, groups, trace)
-                } else if let Some(groups) = TESTCASE_REGEX.captures(&trace.function) {
-                    self.filter_testcase(run_config, groups, trace)
-                } else {
-                    None
-                };
-
-            single_point.map(|p| vec![p])
-        } else {
-            multi_point
+            }
+            .map(|p| vec![p])
         }
     }
 
