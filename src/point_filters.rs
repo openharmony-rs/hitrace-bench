@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::LazyLock};
+use std::sync::LazyLock;
 
 use itertools::Itertools;
 use log::error;
@@ -100,7 +100,8 @@ static LCP_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 static CROSS_PROCESS_INSTANT: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^CrossProcessInstant\s*\{\s*value:\s*(\d+)\s*\}$").expect("Could not parse regexp")
+    Regex::new(r"^paint_time=CrossProcessInstant\s*\{\s*value:\s*(\d+)\s*\},area=(\d*).*$")
+        .expect("Could not parse regexp")
 });
 
 /// A parsed trace point metric
@@ -272,7 +273,8 @@ impl PointFilter {
         let _whole_match = match_iter.next();
         let filter_name = match_iter.next().expect("Could not find match").as_str();
         let key_values = match_iter.next().expect("Could not find match").as_str();
-        let kv_hashmap = trace_kv_str_to_hashmap(key_values);
+        let lcp_values = parse_lcp_trace(key_values).expect("Could not parse LCP values");
+        println!(">>> {:?}, {:?}", key_values, lcp_values);
 
         if filter_name == SERVO_LCP_STRING {
             Some(vec![
@@ -283,23 +285,13 @@ impl PointFilter {
                         + "/paint_time",
                     no_unit_conversion: self.no_unit_conversion,
                     trace: Some(trace),
-                    point_type: PointType::LargestContentfulPaint(trace_special_case_parser(
-                        kv_hashmap
-                            .get("paint_time")
-                            .expect("[paint_time] field was not found in the LCP trace"),
-                    )?),
+                    point_type: PointType::LargestContentfulPaint(lcp_values.paint_time),
                 },
                 Point {
                     name: run_config.run_args.url.to_owned() + "/" + self.name.as_str() + "/area",
                     no_unit_conversion: self.no_unit_conversion,
                     trace: Some(trace),
-                    point_type: PointType::LargestContentfulPaint(
-                        kv_hashmap
-                            .get("area")
-                            .expect("Area field was not found in the LCP trace")
-                            .parse::<u64>()
-                            .expect("Could not parse area in LCP"),
-                    ),
+                    point_type: PointType::LargestContentfulPaint(lcp_values.area),
                 },
             ])
         } else {
@@ -435,76 +427,45 @@ impl PointFilter {
     }
 }
 
+#[derive(PartialEq, Debug)]
+struct LCPTraceValues {
+    paint_time: u64,
+    area: u64,
+}
 /// This function takes value from the hitrace-sys's start_trace_ex's `key=value,` string
 ///
 /// Example paint_time=CrossProcessInstant { value: 219733332872200 },area=90810,pipeline_id=(1,1)
-fn trace_kv_str_to_hashmap(input: &str) -> HashMap<String, String> {
-    let mut result = HashMap::new();
-    let mut depth = 0;
-    let mut last_split = 0;
-
-    // Due to nesting, instead of expected simple split by comma
-    // I have to check for open nested brakest or parantaces
-    // I do not parse the whole thing, just the top level key values
-    for (i, c) in input.char_indices() {
-        match c {
-            '(' | '{' | '[' => depth += 1,
-            ')' | '}' | ']' => depth -= 1,
-            ',' if depth == 0 => {
-                if let Some((k, v)) = input[last_split..i].split_once('=') {
-                    result.insert(k.to_string(), v.to_string());
-                }
-                last_split = i + 1;
-            }
-            _ => {}
-        }
+fn parse_lcp_trace(input: &str) -> Option<LCPTraceValues> {
+    if let Some(groups) = CROSS_PROCESS_INSTANT.captures(input) {
+        return Some(LCPTraceValues {
+            paint_time: groups
+                .get(1)
+                .expect("Could not find paint_time in LCP trace using REGEX")
+                .as_str()
+                .parse()
+                .expect("Count not parse paint_time from LCP trace using REGEX"),
+            area: groups
+                .get(2)
+                .expect("Could not find paint_time in LCP trace using REGEX")
+                .as_str()
+                .parse()
+                .expect("Count not parse paint_time from LCP trace using REGEX"),
+        });
     }
-
-    // Handle last segment
-    if let Some((k, v)) = input[last_split..].split_once('=') {
-        result.insert(k.to_string(), v.to_string());
-    }
-
-    result
-}
-
-/// This function is only here because in servo/servo CrossProcessInstant does not export value
-fn trace_special_case_parser(value: &str) -> Option<u64> {
-    if let Ok(v) = value.parse::<u64>() {
-        return Some(v);
-    }
-
-    // Handle: CrossProcessInstant { value: 219733332872200 }
-    CROSS_PROCESS_INSTANT
-        .captures(value)
-        .and_then(|caps| caps.get(1))
-        .and_then(|m| m.as_str().parse::<u64>().ok())
+    None
 }
 
 #[test]
 fn test_trace_kv_parsing() {
     let test_str =
-        "paint_time=CrossProcessInstant { value: 219733332872200 },area=90810,pipeline_id=(1,1)"
+        "paint_time=CrossProcessInstant { value: 231277222481376 },area=4095,lcp_type=Image,pipeline_id=(1,1)"
             .to_string();
 
     assert_eq!(
-        trace_kv_str_to_hashmap(&test_str),
-        [
-            (
-                "paint_time",
-                "CrossProcessInstant { value: 219733332872200 }"
-            ),
-            ("area", "90810"),
-            ("pipeline_id", "(1,1)")
-        ]
-        .into_iter()
-        .map(|(k, v)| (k.to_string(), v.to_string()))
-        .collect::<HashMap<String, String>>()
-    );
-
-    let test_case1_str = "CrossProcessInstant { value: 219733332872200 }";
-    assert_eq!(
-        trace_special_case_parser(test_case1_str),
-        Some(219733332872200)
+        parse_lcp_trace(&test_str),
+        Some(LCPTraceValues {
+            paint_time: 231277222481376,
+            area: 4095
+        })
     );
 }
