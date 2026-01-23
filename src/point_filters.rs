@@ -408,9 +408,6 @@ impl PointFilter {
                             name,
                             no_unit_conversion: vals.first().unwrap().no_unit_conversion,
                             trace: None,
-                            // Unreachable by PointFilterType::Default and exhausted
-                            // wildcard_in_or_pattern to Explicitly show that there is no Defaults
-                            #[allow(clippy::wildcard_in_or_patterns)]
                             point_type: match self.point_filter_type {
                                 PointFilterType::Largest => PointType::LargestContentfulPaint(
                                     vals.iter()
@@ -419,11 +416,13 @@ impl PointFilter {
                                         .unwrap(),
                                 ),
 
-                                PointFilterType::Combined | _ => PointType::Combined(
+                                PointFilterType::Combined => PointType::Combined(
                                     vals.iter()
                                         .map(|p| p.point_type.numeric_value().unwrap())
                                         .sum(),
                                 ),
+
+                                PointFilterType::Default => panic!("should not be reachable"),
                             },
                         }
                     }
