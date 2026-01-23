@@ -18,10 +18,13 @@ static V1_INPUT_PATH: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("testda
 static V5_INPUT_PATH: LazyLock<PathBuf> = LazyLock::new(|| PathBuf::from("testdata/v5_1_1.ftrace"));
 static V5_LCP_INPUT_PATH: LazyLock<PathBuf> =
     LazyLock::new(|| PathBuf::from("testdata/v5_1_1_LCP.ftrace"));
+static V5_FCP_INPUT_PATH: LazyLock<PathBuf> =
+    LazyLock::new(|| PathBuf::from("testdata/v5_1_1_FCP.ftrace"));
 
 const V1_OUTPUT: &str = include_str!("../testdata/v1_output.json");
 const V5_OUTPUT: &str = include_str!("../testdata/v5_1_1_output.json");
 const V5_LCP_OUTPUT: &str = include_str!("../testdata/v5_1_1_LCP_output.json");
+const V5_FCP_OUTPUT: &str = include_str!("../testdata/v5_1_1_FCP_output.json");
 
 struct Testcase<'a> {
     input_file_path: PathBuf,
@@ -57,6 +60,23 @@ fn full_v5_with_lcp() {
             match_str: String::from("LargestContentfulPaint"),
             no_unit_conversion: true,
             point_filter_type: PointFilterType::Largest,
+        }],
+    );
+}
+
+#[test]
+fn full_v5_with_fcp() {
+    parsing_common_with_extra_filters(
+        Testcase {
+            input_file_path: V5_FCP_INPUT_PATH.to_path_buf(),
+            output_file_str: V5_FCP_OUTPUT,
+        },
+        vec![],
+        vec![PointFilter {
+            name: String::from("FirstContentfulPaint"),
+            match_str: String::from("FirstContentfulPaint"),
+            no_unit_conversion: true,
+            point_filter_type: PointFilterType::Default,
         }],
     );
 }
@@ -131,6 +151,32 @@ fn test_lcp_v5() {
 
     assert_eq!(
         test_filters(V5_LCP_INPUT_PATH.to_path_buf(), vec![], point_filters).unwrap(),
+        expected_json
+    );
+}
+
+#[test]
+fn test_fcp_v5() {
+    // FirstContentfulPaint
+    let point_filters = vec![PointFilter {
+        name: String::from("FirstContentfulPaint"),
+        match_str: String::from("FirstContentfulPaint"),
+        no_unit_conversion: true,
+        point_filter_type: PointFilterType::Default,
+    }];
+
+    let expected_json = json!({
+        "E2E/https://servo.org/FirstContentfulPaint/paint_time": {
+            "Nanoseconds": {
+            "value": 271633800350218.0,
+            "lower_value": 271633800350218.0,
+            "upper_value": 271633800350218.0
+            }
+        }
+    });
+
+    assert_eq!(
+        test_filters(V5_FCP_INPUT_PATH.to_path_buf(), vec![], point_filters).unwrap(),
         expected_json
     );
 }
