@@ -37,7 +37,7 @@ fn print_differences(args: &RunArgs, results: RunResults) {
     }
 
     println!(
-        "\n----name {} {} {}------({}) runs (hp:{})------------------------",
+        "----name {} {} {}------({}) runs (hp:{})------------------------",
         "avg".yellow(),
         "min".green(),
         "max".red(),
@@ -88,8 +88,8 @@ fn print_differences(args: &RunArgs, results: RunResults) {
                 );
             }
         }
-        println!();
     }
+    println!();
 }
 
 /// Process the filters from traces. These are the traces per run_config
@@ -145,6 +145,7 @@ pub(crate) fn run_runconfig(
     filter_errors: &mut FilterErrors,
     points: &mut PointResults,
 ) -> Result<()> {
+    info!("Running Test url {}", run_config.run_args.url);
     for i in 1..run_config.run_args.tries + 1 {
         info!("Running test {i}");
         let traces = if let Some(ref file) = run_config.args.trace_file {
