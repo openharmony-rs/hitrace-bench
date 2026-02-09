@@ -1,9 +1,14 @@
 //! Functions to handle the device
 use anyhow::{Context, Result, anyhow};
 use log::info;
-use std::{path::PathBuf, process::Command};
+use std::{
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+};
 
 use crate::args::RunArgs;
+
+const PROXY_PORT: &str = "8080";
 
 /// We test if the device is reachable, i.e., the list of hdc list targets is non empty.
 /// It can happen that another IDE is connected to it and then we cannot reach it (and no command fails)
@@ -95,6 +100,12 @@ pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<P
         run_args.url.clone()
     };
 
+    let _mitmproxy = if run_args.mitmproxy {
+        MitmProxy::new().ok()
+    } else {
+        None
+    };
+
     // start trace
     Command::new(&hdc)
         .args([
@@ -113,7 +124,8 @@ pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<P
         .output()?;
 
     // start the ability
-    let mut cmd_args = vec![
+    let mut ability_start_arg = Command::new(&hdc);
+    ability_start_arg.args([
         "shell",
         "aa",
         "start",
@@ -128,12 +140,27 @@ pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<P
         "--ps=--tracing-filter",
         "trace",
         "--psn=--pref=largest_contentful_paint_enabled=true",
-    ];
+    ]);
     if let Some(ref v) = run_args.commands {
-        let mut v = v.iter().map(|s| s.as_str()).collect();
-        cmd_args.append(&mut v);
+        for i in v {
+            ability_start_arg.arg(i);
+        }
     }
-    Command::new(&hdc).args(cmd_args).output()?;
+    if run_args.mitmproxy {
+        ability_start_arg.args([
+            format!(
+                "--psn=--pref=network_http_proxy_uri=http://127.0.0.1:{}",
+                PROXY_PORT
+            ),
+            format!(
+                "--psn=--pref=network_https_proxy_uri=http://127.0.0.1:{}",
+                PROXY_PORT
+            ),
+        ]);
+        ability_start_arg.arg("--psn=--ignore-certificate-errors");
+    }
+
+    ability_start_arg.output()?;
     info!("Sleeping for {}", run_args.sleep);
     std::thread::sleep(std::time::Duration::from_secs(run_args.sleep));
 
@@ -173,5 +200,52 @@ pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<P
             tmp_path.to_str().unwrap(),
         ])
         .output()?;
+
     Ok(tmp_path)
+}
+
+struct MitmProxy(Child);
+
+impl MitmProxy {
+    fn new() -> Result<Self> {
+        let hdc = which::which("hdc").context("Is hdc in the path?")?;
+        let ports_forwarded = Command::new(&hdc).args(["fport", "ls"]).output()?;
+        let output =
+            String::from_utf8(ports_forwarded.stdout).context("Hdc reported weird characters")?;
+        if !output.contains(PROXY_PORT) {
+            Command::new(&hdc)
+                .args([
+                    "rport".into(),
+                    format!("tcp:{}", PROXY_PORT),
+                    format!("tcp:{}", PROXY_PORT),
+                ])
+                .output()
+                .context("Could not forward port")?;
+        }
+
+        let mitmdump = which::which("mitmdump").context("Is mitmdump in path?")?;
+        let mut mitmdump_cmd = Command::new(mitmdump);
+        mitmdump_cmd.args(["--set", "ssl_insecure=true", "-p", PROXY_PORT]);
+
+        if let Ok(proxy) = std::env::var("http_proxy") {
+            mitmdump_cmd.arg("--mode");
+            mitmdump_cmd.arg(format!("upstream:{}", proxy));
+            info!("Starting mitmdump with proxy {:?}", proxy);
+        }
+        mitmdump_cmd.stdout(Stdio::piped());
+        mitmdump_cmd.env_clear(); // Does not hurt and prevents secret leaks, I hope.
+
+        Ok(MitmProxy(mitmdump_cmd.stdout(Stdio::piped()).spawn()?))
+    }
+}
+
+impl Drop for MitmProxy {
+    fn drop(&mut self) {
+        if self.0.kill().is_err() {
+            log::error!("Problem killing mitmproxy");
+        }
+        if self.0.wait().is_err() {
+            log::error!("Could not wait on killed process");
+        }
+    }
 }

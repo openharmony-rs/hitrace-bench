@@ -105,6 +105,11 @@ pub(crate) struct RunArgs {
     #[arg(long, trailing_var_arg(true), allow_hyphen_values(true), num_args=0..)]
     #[serde(default = "default_commands")]
     pub(crate) commands: Option<Vec<String>>,
+
+    /// Use mitmproxy. Automatically start mitmdump and kill it again after the run.
+    #[arg(long, default_value_t = false)]
+    #[serde(default = "default_mitmproxy")]
+    pub(crate) mitmproxy: bool,
 }
 
 impl Default for RunArgs {
@@ -117,6 +122,7 @@ impl Default for RunArgs {
             sleep: default_sleep(),
             bundle_name: default_bundle_name(),
             commands: default_commands(),
+            mitmproxy: false,
         }
     }
 }
@@ -148,4 +154,8 @@ fn default_bundle_name() -> String {
 
 fn default_commands() -> Option<Vec<String>> {
     None
+}
+
+fn default_mitmproxy() -> bool {
+    false
 }
