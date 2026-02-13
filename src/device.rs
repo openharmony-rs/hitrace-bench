@@ -4,6 +4,7 @@ use log::info;
 use std::{
     path::PathBuf,
     process::{Child, Command, Stdio},
+    str::FromStr,
 };
 
 use crate::args::RunArgs;
@@ -35,6 +36,29 @@ pub(crate) fn stop_tracing(buffer: u64) -> Result<()> {
         .output()
         .map(|_| ())
         .map_err(|_| anyhow!("Could not stop trace"))
+}
+
+/// Take a screenshot and return the Path on the host, not the phone. Currently the path is fixed.
+fn take_screenshot() -> Result<PathBuf> {
+    let hdc = which::which("hdc").context("Is hdc in the path?")?;
+    const DEVICE_PATH: &str = "/data/local/tmp/servo.jpeg";
+    // if the delete does not work we do not really care
+    let _ = Command::new(&hdc)
+        .args(["rm", "-f", DEVICE_PATH])
+        .output()
+        .map(|_| ());
+    Command::new(&hdc)
+        .args(["shell", "snapshot_display", "-f", DEVICE_PATH])
+        .output()
+        .map(|_| ())
+        .map_err(|_| anyhow!("Could not take screenshot"))?;
+    Command::new(&hdc)
+        .args(["file", "recv", DEVICE_PATH, "/tmp/servo.jpeg"])
+        .output()
+        .map(|_| ())
+        .map_err(|_| anyhow!("Could not transfer screenshot"))?;
+
+    PathBuf::from_str("/tmp/servo.jpg").map_err(|_| anyhow!("Could not convert file"))
 }
 
 #[derive(Debug)]
@@ -181,6 +205,8 @@ pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<P
                 "/data/local/tmp/ohtrace.txt",
             ])
             .output()?;
+        let path = take_screenshot()?;
+        println!("Took screenshot {path:?}");
         return Err(anyhow!(
             "{} did not start or crashed. Please check the application logs.",
             run_args.bundle_name
