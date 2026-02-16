@@ -4,6 +4,7 @@ use serde_json::json;
 use crate::args::Args;
 use crate::bencher::{self, generate_result_json_str};
 use crate::point_filters::PointFilterType;
+use crate::runconfig::read_run_file;
 use crate::utils::RunResults;
 use crate::{
     args::RunArgs, filter::Filter, point_filters::PointFilter, runconfig::RunConfig, trace::Trace,
@@ -11,6 +12,7 @@ use crate::{
 use crate::{run_runconfig, runconfig};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::LazyLock;
 use std::vec;
 
@@ -29,6 +31,44 @@ const V5_FCP_OUTPUT: &str = include_str!("../testdata/v5_1_1_FCP_output.json");
 struct Testcase<'a> {
     input_file_path: PathBuf,
     output_file_str: &'a str,
+}
+
+
+#[test]
+fn parse_pointfilter_json() -> anyhow::Result<()> {
+    let runs_json_path = PathBuf::from_str("testdata/runs.json")?;
+    let test_args = Args::test_default(runs_json_path.clone());
+    let run_config: Vec<RunConfig> = read_run_file(&runs_json_path, &test_args)?;
+    let run_config = &run_config[0];
+
+    assert_eq!(run_config.run_args.url, "https://www.google.com");
+    assert_eq!(run_config.run_args.tries, 5);
+    assert_eq!(run_config.run_args.mitmproxy, true);
+
+
+    assert_eq!(run_config.point_filters.len(), 4);
+    let first = &run_config.point_filters[0];
+    let snd = &run_config.point_filters[1];
+    let third = &run_config.point_filters[2];
+    let fourth = &run_config.point_filters[3];
+
+    assert_eq!(first.match_str, "explicit");
+    assert_eq!(first.name, "Explicit");
+    assert_eq!(first.point_filter_type, PointFilterType::Default);
+
+    assert_eq!(snd.match_str, "resident-according-to-smaps");
+    assert_eq!(snd.name, "resident-smaps");
+    assert_eq!(snd.point_filter_type, PointFilterType::Combined);
+
+    assert_eq!(third.match_str, "LargestContentfulPaint");
+    assert_eq!(third.name, "LargestContentfulPaint");
+    assert_eq!(third.point_filter_type, PointFilterType::Largest);
+
+    assert_eq!(fourth.match_str, "FirstContentfulPaint");
+    assert_eq!(fourth.name, "FirstContentfulPaint");
+    assert_eq!(fourth.point_filter_type, PointFilterType::Default);
+
+    Ok(())
 }
 
 #[test]
