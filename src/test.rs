@@ -33,7 +33,6 @@ struct Testcase<'a> {
     output_file_str: &'a str,
 }
 
-
 #[test]
 fn parse_pointfilter_json() -> anyhow::Result<()> {
     let runs_json_path = PathBuf::from_str("testdata/runs.json")?;
@@ -44,7 +43,6 @@ fn parse_pointfilter_json() -> anyhow::Result<()> {
     assert_eq!(run_config.run_args.url, "https://www.google.com");
     assert_eq!(run_config.run_args.tries, 5);
     assert_eq!(run_config.run_args.mitmproxy, true);
-
 
     assert_eq!(run_config.point_filters.len(), 4);
     let first = &run_config.point_filters[0];
