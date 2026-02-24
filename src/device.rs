@@ -4,7 +4,9 @@ use log::info;
 use std::{
     path::PathBuf,
     process::{Child, Command, Stdio},
-    str::FromStr, thread, time::Duration,
+    str::FromStr,
+    thread,
+    time::Duration,
 };
 
 use crate::args::RunArgs;
