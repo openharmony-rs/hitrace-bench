@@ -1,0 +1,35 @@
+// This json file allows comments and is technically a hjson file.
+// Different {} correspond to completely different runs which can have
+// different filters and different arguments
+[
+    {
+        "run_args": {
+            "url": "https://www.google.com", // the url to test
+            "tries": 5, // How many repeated tries we should have, we show the min,max,avg in the output
+            "mitmproxy": true   // Use mitmproxy in forwarding mode
+            //"trace_buffer": 524288,   // trace_buffer size of hitrace
+            //"sleep": 10,  // how long should we wait for servo to load the page
+            //"commands": ["--ps=--tracing-filter", "info"] // arbitrary additional arguments
+        },
+        "point_filters": [
+            {
+                "name": "Explicit",
+                "match_str": "explicit"
+            },
+            {
+                "name": "resident-smaps",
+                "match_str": "resident-according-to-smaps",
+                "point_filter_type": "Combined"
+            },
+            {
+                "name": "LargestContentfulPaint",
+                "match_str": "LargestContentfulPaint",
+                "point_filter_type": "Largest"
+            },
+            {
+                "name": "FirstContentfulPaint",
+                "match_str": "FirstContentfulPaint"
+            }
+        ]
+    }
+]

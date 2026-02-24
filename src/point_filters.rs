@@ -15,7 +15,7 @@ const SERVO_LCP_STRING: &str = "LargestContentfulPaint";
 const SERVO_FCP_STRING: &str = "FirstContentfulPaint";
 
 // checked Default, Deserialize^,
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Default, PartialEq)]
 pub(crate) enum PointFilterType {
     #[default]
     Default,
