@@ -5,6 +5,8 @@ use std::{
     path::PathBuf,
     process::{Child, Command, Stdio},
     str::FromStr,
+    thread,
+    time::Duration,
 };
 
 use crate::args::RunArgs;
@@ -261,7 +263,12 @@ impl MitmProxy {
         mitmdump_cmd.stdout(Stdio::piped());
         mitmdump_cmd.env_clear(); // Does not hurt and prevents secret leaks, I hope.
 
-        Ok(MitmProxy(mitmdump_cmd.stdout(Stdio::piped()).spawn()?))
+        let proxy = MitmProxy(mitmdump_cmd.stdout(Stdio::piped()).spawn()?);
+
+        // Mitmproxy needs a bit to spawn and returning immedieately might be missing it.
+        thread::sleep(Duration::from_secs(1));
+
+        Ok(proxy)
     }
 }
 
