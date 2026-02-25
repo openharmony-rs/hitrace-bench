@@ -187,14 +187,16 @@ pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<P
     }
 
     ability_start_arg.output()?;
-    info!("Sleeping for {}", run_args.sleep);
-    std::thread::sleep(std::time::Duration::from_secs(run_args.sleep));
-
     // Getting app pid is a simple test if the app perhaps crashed during the benchmark / test.
+    // Because teh app might finish rendering really fast, we need to be fast to check for the pid.
+    std::thread::sleep(std::time::Duration::from_millis(100));
     let cmd = Command::new(&hdc)
         .args(["shell", "pidof", &run_args.bundle_name])
         .output()
         .with_context(|| format!("Is `{}` installed?", run_args.bundle_name))?;
+    info!("Sleeping for {}", run_args.sleep);
+    std::thread::sleep(std::time::Duration::from_secs(run_args.sleep));
+
     if cmd.stdout.is_empty() {
         Command::new(&hdc)
             .args([
