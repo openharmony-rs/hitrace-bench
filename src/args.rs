@@ -173,7 +173,7 @@ impl RunArgs {
     /// defaults supply `https://servo.org`.
     pub(crate) fn resolved_url(&self) -> Option<&str> {
         match self.url.as_deref() {
-            Some(url) if url.is_empty() => None,
+            Some("") => None,
             Some(url) => Some(url),
             None if self.servo_defaults() => Some(SERVO_DEFAULT_URL),
             None => None,
