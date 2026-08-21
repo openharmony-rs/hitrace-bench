@@ -42,7 +42,7 @@ fn print_differences(args: &RunArgs, results: RunResults) {
         "min".green(),
         "max".red(),
         args.tries,
-        args.url
+        args.result_label()
     );
     for (key, val) in results.filter_results.iter() {
         let avg_min_max = avg_min_max::<Duration, u16>(val);
@@ -103,7 +103,7 @@ fn run_runconfig_filters(
     let differences = filter::find_notable_differences(traces, &run_config.filters);
     for (original_key, value) in differences.into_iter() {
         let key = if run_config.args.run_file.is_some() {
-            format!("{}/{}", run_config.run_args.url, original_key)
+            format!("{}/{}", run_config.run_args.result_label(), original_key)
         } else {
             original_key.to_owned()
         };
@@ -145,7 +145,7 @@ pub(crate) fn run_runconfig(
     filter_errors: &mut FilterErrors,
     points: &mut PointResults,
 ) -> Result<()> {
-    info!("Running Test url {}", run_config.run_args.url);
+    info!("Running Test {}", run_config.run_args.result_label());
     for i in 1..run_config.run_args.tries + 1 {
         info!("Running test {i}");
         let traces = if let Some(ref file) = run_config.args.trace_file {
@@ -257,9 +257,10 @@ fn main() -> Result<()> {
                 },
             ];
 
+            let run_args = RunArgs::try_from(&args).unwrap_or_default();
             vec![RunConfig::new(
                 args.clone(),
-                RunArgs::default(),
+                run_args,
                 filters,
                 point_filters,
             )]

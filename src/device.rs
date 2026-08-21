@@ -9,7 +9,7 @@ use std::{
     time::Duration,
 };
 
-use crate::args::RunArgs;
+use crate::args::{RunArgs, servo_default_launch_flags, servo_mitmproxy_launch_flags};
 
 const PROXY_PORT: &str = "8080";
 
@@ -94,6 +94,34 @@ fn device_file_paths(file_name: &str, bundle_name: &str, is_rooted: bool) -> Dev
     }
 }
 
+/// Build `hdc aa start` arguments for the app under test.
+///
+/// `ability_uri` is the optional `-U` value (already rewritten for `file://` uploads).
+/// Servo-specific launch flags are included only when servo defaults are enabled.
+pub(crate) fn ability_start_args(run_args: &RunArgs, ability_uri: Option<&str>) -> Vec<String> {
+    let mut args = vec![
+        "shell".to_owned(),
+        "aa".to_owned(),
+        "start".to_owned(),
+        "-a".to_owned(),
+        "EntryAbility".to_owned(),
+        "-b".to_owned(),
+        run_args.bundle_name.clone(),
+    ];
+    if let Some(uri) = ability_uri {
+        args.push("-U".to_owned());
+        args.push(uri.to_owned());
+    }
+    if run_args.servo_defaults() {
+        args.extend(servo_default_launch_flags());
+    }
+    args.extend(run_args.forwarded_app_args());
+    if run_args.mitmproxy && run_args.servo_defaults() {
+        args.extend(servo_mitmproxy_launch_flags(PROXY_PORT));
+    }
+    args
+}
+
 /// Execute the hdc commands on the device.
 pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<PathBuf> {
     info!("Executing hdc commands");
@@ -104,26 +132,30 @@ pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<P
         .output()
         .context("Could not execute hdc")?;
 
-    let url = if run_args.url.contains("file:///") {
-        let device_file_path = device_file_paths(&run_args.url, &run_args.bundle_name, is_rooted);
+    let ability_uri = if let Some(url) = run_args.resolved_url() {
+        if url.contains("file:///") {
+            let device_file_path = device_file_paths(url, &run_args.bundle_name, is_rooted);
 
-        if is_rooted {
-            info!(
-                "Uploading to {} visible as {}",
-                device_file_path.on_device, device_file_path.in_app
-            );
-            Command::new(&hdc)
-                .args([
-                    "file",
-                    "send",
-                    &device_file_path.stem,
-                    &device_file_path.on_device,
-                ])
-                .output()?;
+            if is_rooted {
+                info!(
+                    "Uploading to {} visible as {}",
+                    device_file_path.on_device, device_file_path.in_app
+                );
+                Command::new(&hdc)
+                    .args([
+                        "file",
+                        "send",
+                        &device_file_path.stem,
+                        &device_file_path.on_device,
+                    ])
+                    .output()?;
+            }
+            Some(device_file_path.in_app)
+        } else {
+            Some(url.to_owned())
         }
-        device_file_path.in_app
     } else {
-        run_args.url.clone()
+        None
     };
 
     let _mitmproxy = if run_args.mitmproxy {
@@ -150,43 +182,9 @@ pub(crate) fn exec_hdc_commands(run_args: &RunArgs, is_rooted: bool) -> Result<P
         .output()?;
 
     // start the ability
-    let mut ability_start_arg = Command::new(&hdc);
-    ability_start_arg.args([
-        "shell",
-        "aa",
-        "start",
-        "-a",
-        "EntryAbility",
-        "-b",
-        &run_args.bundle_name,
-        "-U",
-        &url,
-        "--ps=--pref",
-        "js_disable_jit=true",
-        "--ps=--tracing-filter",
-        "trace",
-        "--psn=--pref=largest_contentful_paint_enabled=true",
-    ]);
-    if let Some(ref v) = run_args.commands {
-        for i in v {
-            ability_start_arg.arg(i);
-        }
-    }
-    if run_args.mitmproxy {
-        ability_start_arg.args([
-            format!(
-                "--psn=--pref=network_http_proxy_uri=http://127.0.0.1:{}",
-                PROXY_PORT
-            ),
-            format!(
-                "--psn=--pref=network_https_proxy_uri=http://127.0.0.1:{}",
-                PROXY_PORT
-            ),
-        ]);
-        ability_start_arg.arg("--psn=--ignore-certificate-errors");
-    }
-
-    ability_start_arg.output()?;
+    Command::new(&hdc)
+        .args(ability_start_args(run_args, ability_uri.as_deref()))
+        .output()?;
     // Getting app pid is a simple test if the app perhaps crashed during the benchmark / test.
     // Because teh app might finish rendering really fast, we need to be fast to check for the pid.
     std::thread::sleep(std::time::Duration::from_millis(100));
@@ -282,5 +280,97 @@ impl Drop for MitmProxy {
         if self.0.wait().is_err() {
             log::error!("Could not wait on killed process");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::args::{SERVO_DEFAULT_BUNDLE, SERVO_DEFAULT_URL, servo_default_launch_flags};
+
+    #[test]
+    fn servo_defaults_keep_homepage_and_servo_flags() {
+        let run_args = RunArgs::default();
+        let args = ability_start_args(&run_args, run_args.resolved_url());
+
+        assert_eq!(
+            &args[..8],
+            [
+                "shell",
+                "aa",
+                "start",
+                "-a",
+                "EntryAbility",
+                "-b",
+                SERVO_DEFAULT_BUNDLE,
+                "-U",
+            ]
+        );
+        assert_eq!(args[8], SERVO_DEFAULT_URL);
+        for flag in servo_default_launch_flags() {
+            assert!(
+                args.contains(&flag),
+                "servo default launch should include {flag}"
+            );
+        }
+    }
+
+    #[test]
+    fn generic_app_does_not_require_homepage_or_servo_flags() {
+        let run_args = RunArgs {
+            no_servo_defaults: true,
+            bundle_name: "com.example.app".to_owned(),
+            app_args: vec!["--foo".to_owned(), "bar".to_owned()],
+            extra_args: vec!["--baz".to_owned()],
+            ..RunArgs::default()
+        };
+        let args = ability_start_args(&run_args, run_args.resolved_url());
+
+        assert_eq!(
+            args,
+            vec![
+                "shell".to_owned(),
+                "aa".to_owned(),
+                "start".to_owned(),
+                "-a".to_owned(),
+                "EntryAbility".to_owned(),
+                "-b".to_owned(),
+                "com.example.app".to_owned(),
+                "--foo".to_owned(),
+                "bar".to_owned(),
+                "--baz".to_owned(),
+            ]
+        );
+        assert!(!args.contains(&"-U".to_owned()));
+        assert!(!args.iter().any(|arg| arg.contains("js_disable_jit")));
+        assert!(!args.iter().any(|arg| arg.contains("tracing-filter")));
+    }
+
+    #[test]
+    fn mitmproxy_flags_are_servo_specific() {
+        let servo = RunArgs {
+            mitmproxy: true,
+            ..RunArgs::default()
+        };
+        let servo_args = ability_start_args(&servo, servo.resolved_url());
+        assert!(
+            servo_args
+                .iter()
+                .any(|arg| arg.contains("network_http_proxy_uri"))
+        );
+
+        let generic = RunArgs {
+            no_servo_defaults: true,
+            mitmproxy: true,
+            app_args: vec!["--psn=--custom-proxy".to_owned()],
+            ..RunArgs::default()
+        };
+        let generic_args = ability_start_args(&generic, generic.resolved_url());
+        assert!(generic_args.contains(&"--psn=--custom-proxy".to_owned()));
+        assert!(
+            !generic_args
+                .iter()
+                .any(|arg| arg.contains("network_http_proxy_uri"))
+        );
     }
 }

@@ -40,7 +40,10 @@ fn parse_pointfilter_json() -> anyhow::Result<()> {
     let run_config: Vec<RunConfig> = read_run_file(&runs_json_path, &test_args)?;
     let run_config = &run_config[0];
 
-    assert_eq!(run_config.run_args.url, "https://www.google.com");
+    assert_eq!(
+        run_config.run_args.url.as_deref(),
+        Some("https://www.google.com")
+    );
     assert_eq!(run_config.run_args.tries, 5);
     assert_eq!(run_config.run_args.mitmproxy, true);
 
