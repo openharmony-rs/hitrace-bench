@@ -167,13 +167,17 @@ impl PointFilter {
             .as_str()
             .parse()
             .expect("Could not parse value");
-        if url.contains(run_config.run_args.url.as_str()) {
+        let matches_url = match run_config.run_args.resolved_url() {
+            Some(expected) => url.contains(expected),
+            None => true,
+        };
+        if matches_url {
             let mut suffix = subsystem_path.split('/').skip(1).join("/");
             if !suffix.is_empty() {
                 suffix.insert(0, '/');
             }
             Some(Point {
-                name: run_config.run_args.url.to_owned()
+                name: run_config.run_args.result_label().to_owned()
                     + "/"
                     + self.name.as_str()
                     + suffix.as_str(),
@@ -207,7 +211,7 @@ impl PointFilter {
                 .parse()
                 .expect("Could not parse");
             Some(Point {
-                name: run_config.run_args.url.to_owned() + "/" + self.name.as_str(),
+                name: run_config.run_args.result_label().to_owned() + "/" + self.name.as_str(),
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
                 point_type: PointType::Smaps(value),
@@ -233,7 +237,7 @@ impl PointFilter {
             .parse()
             .expect("Could not parse value");
         Some(Point {
-            name: run_config.run_args.url.to_owned() + "/" + self.name.as_str(),
+            name: run_config.run_args.result_label().to_owned() + "/" + self.name.as_str(),
             no_unit_conversion: self.no_unit_conversion,
             trace: Some(trace),
             point_type: PointType::MemoryReport(value),
@@ -260,7 +264,7 @@ impl PointFilter {
             .expect("Could not parse value");
         if case_name.contains(&self.match_str) {
             Some(Point {
-                name: run_config.run_args.url.to_owned() + "/",
+                name: run_config.run_args.result_label().to_owned() + "/",
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
                 point_type: PointType::Testcase(value),
@@ -286,7 +290,7 @@ impl PointFilter {
             let lcp_values = parse_lcp_trace(key_values).expect("Could not parse LCP values");
             Some(vec![
                 Point {
-                    name: run_config.run_args.url.to_owned()
+                    name: run_config.run_args.result_label().to_owned()
                         + "/"
                         + self.name.as_str()
                         + "/paint_time",
@@ -295,7 +299,10 @@ impl PointFilter {
                     point_type: PointType::LargestContentfulPaint(lcp_values.paint_time),
                 },
                 Point {
-                    name: run_config.run_args.url.to_owned() + "/" + self.name.as_str() + "/area",
+                    name: run_config.run_args.result_label().to_owned()
+                        + "/"
+                        + self.name.as_str()
+                        + "/area",
                     no_unit_conversion: self.no_unit_conversion,
                     trace: Some(trace),
                     point_type: PointType::LargestContentfulPaint(lcp_values.area),
@@ -303,7 +310,10 @@ impl PointFilter {
             ])
         } else if filter_name == SERVO_FCP_STRING {
             Some(vec![Point {
-                name: run_config.run_args.url.to_owned() + "/" + self.name.as_str() + "/paint_time",
+                name: run_config.run_args.result_label().to_owned()
+                    + "/"
+                    + self.name.as_str()
+                    + "/paint_time",
                 no_unit_conversion: self.no_unit_conversion,
                 trace: Some(trace),
                 point_type: PointType::LargestContentfulPaint(
