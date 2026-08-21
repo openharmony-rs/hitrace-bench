@@ -1,6 +1,6 @@
 use std::{fmt::Display, fs::read_to_string, path::PathBuf};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Result, anyhow};
 use serde::Deserialize;
 
 use crate::{
@@ -101,8 +101,7 @@ pub(crate) fn into_run_config(args: Args, run_config_json: RunConfigJson) -> Run
 /// read a run file into runs.
 pub(crate) fn read_run_file(path: &PathBuf, args: &Args) -> Result<Vec<RunConfig>> {
     let file_content = read_to_string(path)?;
-    let jd = &mut json5::Deserializer::from_str(&file_content)
-        .context("Could not read runconfig file")?;
+    let jd = &mut json5::Deserializer::from_str(&file_content);
 
     let result: Result<Vec<RunConfigJson>, _> = serde_path_to_error::deserialize(jd);
     if let Err(err) = result {
